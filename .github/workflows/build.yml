@@ -20,9 +20,10 @@ jobs:
         distribution: 'temurin'
 
     - name: Setup Android NDK
-      uses: nvm-sh/setup-android-ndk@v1
+      uses: nttld/setup-ndk@v1
       with:
         ndk-version: r26b
+        link-to-sdk: true
 
     - name: Download & Setup Native Dependencies
       run: |
@@ -45,14 +46,14 @@ jobs:
         cp OpenCV-android-sdk/sdk/native/libs/arm64-v8a/libopencv_java4.so app/src/main/cpp/third_party/opencv/lib/arm64-v8a/libopencv_features2d.so
         cp -r OpenCV-android-sdk/sdk/native/jni/include/* app/src/main/cpp/third_party/opencv/include/
 
-    - name: Generate Gradle Wrapper
-      run: |
-        gradle wrapper
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v3
+      with:
+        gradle-version: "8.6"
 
     - name: Build Debug APK
       run: |
-        chmod +x gradlew
-        ./gradlew assembleDebug --stacktrace
+        gradle assembleDebug --stacktrace
 
     - name: Upload Finished APK
       uses: actions/upload-artifact@v4
