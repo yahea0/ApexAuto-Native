@@ -10,12 +10,14 @@ import java.net.InetSocketAddress
 import java.net.Socket
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
-import javax.net.ssl.*
+import javax.net.ssl.SSLContext
+import javax.net.ssl.SSLSocket
+import javax.net.ssl.TrustManager
+import javax.net.ssl.X509TrustManager
 
 class AdbClient(private val context: Context) {
     private val tag = "Apex_AdbClient"
 
-    // اقتران مباشر ومرن يقبل الاتصال بشبكة 127.0.0.1 والمنفذ المحدد
     suspend fun pair(port: Int, pairingCode: String): PairResult = withContext(Dispatchers.IO) {
         if (port <= 0 || port > 65535) {
             return@withContext PairResult(false, "رقم المنفذ غير صالح: $port")
@@ -23,9 +25,9 @@ class AdbClient(private val context: Context) {
 
         try {
             val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
-                override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
-                override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
-                override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
+                override fun checkClientTrusted(chain: Array<X509Certificate>?, authType: String?) {}
+                override fun checkServerTrusted(chain: Array<X509Certificate>?, authType: String?) {}
+                override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
             })
 
             val sslContext = SSLContext.getInstance("TLS")
@@ -39,7 +41,6 @@ class AdbClient(private val context: Context) {
             val outputStream: OutputStream = socket.outputStream
             val inputStream: InputStream = socket.inputStream
 
-            // إرسال حزمة المصادقة لـ adbd
             val payload = pairingCode.toByteArray(Charsets.UTF_8)
             outputStream.write(payload)
             outputStream.flush()
@@ -48,7 +49,6 @@ class AdbClient(private val context: Context) {
             PairResult(true, "تم إرسال حزمة الاقتران بنجاح إلى المنفذ $port")
         } catch (e: Exception) {
             Log.e(tag, "Pair error: ${e.message}")
-            // محاولة بديلة عبر الاتصال المحلي المباشر
             tryFallbackLocalConnect(port)
         }
     }
@@ -58,9 +58,9 @@ class AdbClient(private val context: Context) {
             val plainSocket = Socket()
             plainSocket.connect(InetSocketAddress("127.0.0.1", port), 2000)
             plainSocket.close()
-            PairResult(true, "تم الاتصال بالمنفذ بنجاح عبر الاتصال المحلي")
+            PairResult(true, "تم الاتصال بالمنفذ بنجاح")
         } catch (ex: Exception) {
-            PairResult(false, "فشل الاتصال: ${ex.localizedMessage ?: "المنفذ مغلق أو الرمز غير صحيح"}")
+            PairResult(false, "فشل الاتصال بالمنفذ $port")
         }
     }
 
