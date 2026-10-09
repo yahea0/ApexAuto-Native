@@ -53,6 +53,23 @@ android {
             version = "3.22.1"
         }
     }
+
+    packaging {
+        resources {
+            excludes += setOf(
+                "/META-INF/{AL2.0,LGPL2.1}",
+                "META-INF/versions/9/OSGI-INF/MANIFEST.MF",
+                "META-INF/versions/**",
+                "META-INF/*.version",
+                "META-INF/DEPENDENCIES",
+                "META-INF/LICENSE*",
+                "META-INF/NOTICE*"
+            )
+            pickFirsts += setOf(
+                "META-INF/versions/9/OSGI-INF/MANIFEST.MF"
+            )
+        }
+    }
 }
 
 dependencies {
