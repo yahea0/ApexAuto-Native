@@ -33,7 +33,6 @@ class ApexAccessibilityService : AccessibilityService() {
         instance = null
     }
 
-    // تنفيذ نقرة حقيقية على أي نقطة في الشاشة بأجزاء من الثانية
     fun performClick(x: Float, y: Float, onComplete: (() -> Unit)? = null): Boolean {
         val path = Path().apply {
             moveTo(x, y)
@@ -42,7 +41,7 @@ class ApexAccessibilityService : AccessibilityService() {
             .addStroke(GestureDescription.StrokeDescription(path, 0, 50))
             .build()
 
-        return dispatchGesture(gesture, object : GestureResultCallback() {
+        return dispatchGesture(gesture, object : AccessibilityService.GestureResultCallback() {
             override fun onCompleted(gestureDescription: GestureDescription?) {
                 super.onCompleted(gestureDescription)
                 onComplete?.invoke()
