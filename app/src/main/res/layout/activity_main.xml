@@ -35,11 +35,11 @@
             android:layout_marginVertical="20dp"
             android:background="#334155" />
 
-        <!-- الخطوة الأساسية: تفعيل النقر الفوري -->
+        <!-- تفعيل محرك النقر الفوري -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="1. الخطوة الأهم: تفعيل محرك النقر الفعلي:"
+            android:text="1. الخطوة الأساسية: تفعيل محرك النقر:"
             android:textColor="#F8FAFC"
             android:textSize="14sp"
             android:textStyle="bold" />
@@ -50,7 +50,7 @@
             android:layout_height="54dp"
             android:layout_marginTop="10dp"
             android:backgroundTint="#F59E0B"
-            android:text="🔑 تفعيل خدمة النقر التلقائي (إمكانية الوصول)"
+            android:text="🔑 تفعيل خدمة النقر (إمكانية الوصول)"
             android:textColor="#FFFFFF"
             android:textStyle="bold" />
 
@@ -60,7 +60,7 @@
             android:layout_marginVertical="20dp"
             android:background="#334155" />
 
-        <!-- الخطوة الثانية: تشغيل لوحة الأتمتة -->
+        <!-- تشغيل الدائرة العائمة -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -78,6 +78,53 @@
             android:text="🔘 إظهار الدائرة العائمة للأتمتة"
             android:textColor="#FFFFFF"
             android:textStyle="bold" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginVertical="20dp"
+            android:background="#334155" />
+
+        <!-- قسم الاقتران اللاسلكي المتقدم -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="3. اختياري: اقتران الـ Shell (ADB):"
+            android:textColor="#94A3B8"
+            android:textSize="13sp" />
+
+        <EditText
+            android:id="@+id/edit_pair_port"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="8dp"
+            android:background="#1E293B"
+            android:hint="المنفذ Port"
+            android:inputType="number"
+            android:paddingHorizontal="16dp"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#64748B" />
+
+        <EditText
+            android:id="@+id/edit_pair_code"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="8dp"
+            android:background="#1E293B"
+            android:hint="رمز الإقران 6 أرقام"
+            android:inputType="number"
+            android:paddingHorizontal="16dp"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#64748B" />
+
+        <Button
+            android:id="@+id/btn_pair"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="8dp"
+            android:backgroundTint="#0284C7"
+            android:text="⚡ اقتران ADB"
+            android:textColor="#FFFFFF" />
 
     </LinearLayout>
 </ScrollView>
