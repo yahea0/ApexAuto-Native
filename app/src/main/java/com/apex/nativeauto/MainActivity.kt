@@ -20,7 +20,6 @@ class MainActivity : AppCompatActivity() {
     private val scope = CoroutineScope(Dispatchers.Main)
     private lateinit var adbClient: AdbClient
     private lateinit var mdnsDiscovery: AdbMdnsDiscovery
-    private var detectedPort = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -29,32 +28,47 @@ class MainActivity : AppCompatActivity() {
         adbClient = AdbClient(this)
         mdnsDiscovery = AdbMdnsDiscovery(this)
 
+        val editPairPort = findViewById<EditText>(R.id.edit_pair_port)
         val editPairCode = findViewById<EditText>(R.id.edit_pair_code)
         val btnPair = findViewById<Button>(R.id.btn_pair)
         val btnStartOverlay = findViewById<Button>(R.id.btn_start_overlay)
 
+        // البحث التلقائي: إذا وجد المنفذ يملأ الخانة تلقائياً
         mdnsDiscovery.discoverServices(object : AdbMdnsDiscovery.DiscoveryCallback {
             override fun onPortDiscovered(port: Int, isPairingService: Boolean) {
-                detectedPort = port
                 runOnUiThread {
-                    Toast.makeText(this@MainActivity, "تم اكتشاف منفذ التصحيح: $port", Toast.LENGTH_SHORT).show()
+                    if (isPairingService && editPairPort.text.isEmpty()) {
+                        editPairPort.setText(port.toString())
+                        Toast.makeText(this@MainActivity, "تم اكتشاف منفذ الإقران تلقائياً: $port", Toast.LENGTH_SHORT).show()
+                    }
                 }
             }
         })
 
         btnPair.setOnClickListener {
-            val code = editPairCode.text.toString().trim()
-            if (code.isNotEmpty() && detectedPort != 0) {
-                scope.launch {
-                    val success = adbClient.pair(detectedPort, code)
-                    if (success) {
-                        Toast.makeText(this@MainActivity, "تم الاقتران وتشغيل المحرك بنجاح!", Toast.LENGTH_LONG).show()
-                    } else {
-                        Toast.makeText(this@MainActivity, "فشل الاقتران، تأكد من الرمز", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            } else {
-                Toast.makeText(this, "يرجى كتابة رمز الاقتران أو التأكد من تفعيل التصحيح اللاسلكي", Toast.LENGTH_SHORT).show()
+            val portText = editPairPort.text.toString().trim()
+            val codeText = editPairCode.text.toString().trim()
+
+            if (portText.isEmpty() || codeText.isEmpty()) {
+                Toast.makeText(this, "يرجى إدخال كل من المنفذ (Port) والرمز المكون من 6 أرقام", Toast.LENGTH_LONG).show()
+                return@setOnClickListener
+            }
+
+            val port = portText.toIntOrNull()
+            if (port == null) {
+                Toast.makeText(this, "رقم المنفذ غير صحيح", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            scope.launch {
+                btnPair.isEnabled = false
+                btnPair.text = "جاري الاقتران..."
+
+                val result = adbClient.pair(port, codeText)
+                Toast.makeText(this@MainActivity, result.message, Toast.LENGTH_LONG).show()
+
+                btnPair.isEnabled = true
+                btnPair.text = "⚡ اقتران وتشغيل الخادم الأصلي (Pair & Deploy)"
             }
         }
 
@@ -67,6 +81,7 @@ class MainActivity : AppCompatActivity() {
                 startActivity(intent)
             } else {
                 startService(Intent(this, OverlayService::class.java))
+                Toast.makeText(this, "تم تشغيل الأيقونة العائمة بنجاح", Toast.LENGTH_SHORT).show()
             }
         }
     }
