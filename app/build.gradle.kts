@@ -11,8 +11,8 @@ android {
         applicationId = "com.apex.nativeauto"
         minSdk = 29
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "2.0.0-PRO"
 
         ndk {
             abiFilters.addAll(setOf("arm64-v8a"))
@@ -58,15 +58,9 @@ android {
         resources {
             excludes += setOf(
                 "/META-INF/{AL2.0,LGPL2.1}",
-                "META-INF/versions/9/OSGI-INF/MANIFEST.MF",
-                "META-INF/versions/**",
-                "META-INF/*.version",
                 "META-INF/DEPENDENCIES",
                 "META-INF/LICENSE*",
                 "META-INF/NOTICE*"
-            )
-            pickFirsts += setOf(
-                "META-INF/versions/9/OSGI-INF/MANIFEST.MF"
             )
         }
     }
@@ -77,6 +71,7 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("com.google.android.material:material:1.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0")
-    implementation("org.bouncycastle:bcpkix-jdk18on:1.78.1")
-    implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
+    
+    // محرك JavaScript لتشغيل الشروط والأكواد الحسابية المخصصة
+    implementation("org.mozilla:rhino:1.7.14")
 }
