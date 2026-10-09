@@ -8,13 +8,14 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center"
+        android:gravity="center_horizontal"
         android:orientation="vertical"
         android:padding="24dp">
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
             android:text="ApexAuto Native"
             android:textColor="#38BDF8"
             android:textSize="26sp"
@@ -23,31 +24,46 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="YOLOv12-N Native Autonomous Engine"
+            android:layout_marginTop="4dp"
+            android:text="محرك الأتمتة الأصيل المباشر (C++20)"
             android:textColor="#94A3B8"
             android:textSize="14sp" />
 
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
-            android:layout_marginVertical="24dp"
+            android:layout_marginVertical="20dp"
             android:background="#334155" />
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="خطوة 1: أدخل رمز الاقتران اللاسلكي (Pairing Code)"
+            android:text="1. بيانات الاقتران (من شاشة تصحيح الأخطاء اللاسلكي):"
             android:textColor="#F8FAFC"
-            android:textSize="13sp" />
+            android:textSize="14sp"
+            android:textStyle="bold" />
 
+        <!-- حقل المنفذ (Port) -->
+        <EditText
+            android:id="@+id/edit_pair_port"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:layout_marginTop="12dp"
+            android:background="#1E293B"
+            android:hint="المنفذ Port (مثال: 38871 من السطر السفلي)"
+            android:inputType="number"
+            android:paddingHorizontal="16dp"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#64748B" />
+
+        <!-- حقل رمز الإقران (Code) -->
         <EditText
             android:id="@+id/edit_pair_code"
             android:layout_width="match_parent"
-            android:layout_height="52dp"
-            android:layout_marginTop="8dp"
+            android:layout_height="50dp"
+            android:layout_marginTop="10dp"
             android:background="#1E293B"
-            android:hint="أدخل الرمز المكون من 6 أرقام"
+            android:hint="رمز إقران Wi-Fi (مثال: 615104)"
             android:inputType="number"
             android:paddingHorizontal="16dp"
             android:textColor="#FFFFFF"
@@ -57,9 +73,9 @@
             android:id="@+id/btn_pair"
             android:layout_width="match_parent"
             android:layout_height="54dp"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="14dp"
             android:backgroundTint="#0284C7"
-            android:text="اقتران وتشغيل المحرك الأصلي (Deploy C++)"
+            android:text="⚡ اقتران وتشغيل الخادم الأصلي (Pair &amp; Deploy)"
             android:textColor="#FFFFFF"
             android:textStyle="bold" />
 
@@ -72,17 +88,18 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="خطوة 2: تشغيل الواجهة العائمة للأتمتة"
+            android:text="2. التحكم العائم:"
             android:textColor="#F8FAFC"
-            android:textSize="13sp" />
+            android:textSize="14sp"
+            android:textStyle="bold" />
 
         <Button
             android:id="@+id/btn_start_overlay"
             android:layout_width="match_parent"
             android:layout_height="54dp"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="10dp"
             android:backgroundTint="#10B981"
-            android:text="تشغيل زر التحكم العائم (Overlay)"
+            android:text="🔘 تشغيل الدائرة العائمة للأتمتة"
             android:textColor="#FFFFFF"
             android:textStyle="bold" />
 
