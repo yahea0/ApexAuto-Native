@@ -4,25 +4,24 @@ import android.graphics.Bitmap
 import android.graphics.RectF
 
 enum class ActionType {
-    CLICK_IMAGE,    // النقر على صورة
-    TAP_COORDINATE, // نقرة إحداثيات عادية
-    JS_SCRIPT       // كود جافا سكريبت شرطي
+    CLICK_IMAGE,
+    TAP_COORDINATE,
+    JS_SCRIPT
 }
 
 enum class DetectScope {
-    CAPTURED_LOCATION, // المكان الافتراضي
-    CUSTOM_REGION,     // منطقة مخصصة
-    FULL_SCREEN        // كامل الشاشة
+    CAPTURED_LOCATION,
+    CUSTOM_REGION,
+    FULL_SCREEN
 }
 
 data class MacroStep(
-    var stepNumber: Int,
+    var stepNumber: Int = 1,
     var name: String = "Action 1",
     var type: ActionType = ActionType.CLICK_IMAGE,
     var targetArea: RectF = RectF(200f, 600f, 500f, 900f),
     var targetImageName: String = "target_1",
     var thumbnail: Bitmap? = null,
-    // قائمة الزوايا والأبعاد المتعددة لتدريب الذكاء الاصطناعي على الهدف
     val trainedVariations: MutableList<Bitmap> = mutableListOf(),
     var similarityPercent: Int = 70,
     var detectScope: DetectScope = DetectScope.FULL_SCREEN,
