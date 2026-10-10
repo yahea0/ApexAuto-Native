@@ -12,8 +12,11 @@ import android.widget.Button
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import com.apex.nativeauto.capture.ImageMatcher
 import com.apex.nativeauto.capture.ScreenCaptureManager
 import com.apex.nativeauto.overlay.OverlayService
+import java.io.File
+import java.io.FileOutputStream
 
 class MainActivity : AppCompatActivity() {
 
@@ -23,15 +26,18 @@ class MainActivity : AppCompatActivity() {
         if (result.resultCode == Activity.RESULT_OK && result.data != null) {
             ScreenCaptureManager.init(this, result.resultCode, result.data!!)
             startService(Intent(this, OverlayService::class.java))
-            Toast.makeText(this, "تم تفعيل التقاط البكسلات الحقيقي بنجاح!", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "تم تفعيل محرك الذكاء الاصطناعي بنجاح!", Toast.LENGTH_SHORT).show()
         } else {
-            Toast.makeText(this, "يلزم الموافقة على التقاط الشاشة لاقتطاع الصور الحقيقية", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "يلزم السماح بالتقاط الشاشة لاقتطاع الصور وفحصها", Toast.LENGTH_LONG).show()
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        // نسخ وتهيئة نموذج YOLOv12 تلقائياً إلى ذاكرة الهاتف
+        prepareYOLOModel()
 
         val btnAccessibility = findViewById<Button>(R.id.btn_enable_accessibility)
         val btnStartOverlay = findViewById<Button>(R.id.btn_start_overlay)
@@ -47,9 +53,24 @@ class MainActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            // طلب صلاحية تصوير الشاشة الحقيقية MediaProjection
             val mpManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
             captureLauncher.launch(mpManager.createScreenCaptureIntent())
+        }
+    }
+
+    private fun prepareYOLOModel() {
+        try {
+            val modelFile = File(filesDir, "yolov12n.onnx")
+            if (!modelFile.exists() || modelFile.length() == 0L) {
+                assets.open("yolov12n.onnx").use { input ->
+                    FileOutputStream(modelFile).use { output ->
+                        input.copyTo(output)
+                    }
+                }
+            }
+            ImageMatcher.setupYOLOModel(modelFile.absolutePath)
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 }
