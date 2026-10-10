@@ -4,6 +4,7 @@ import android.app.Activity
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.graphics.Color
@@ -16,6 +17,7 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.view.inputmethod.InputMethodManager
 import android.widget.*
 import androidx.core.app.NotificationCompat
 import com.apex.nativeauto.accessibility.ApexAccessibilityService
@@ -26,6 +28,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.min
 
 class OverlayService : Service() {
 
@@ -36,6 +40,7 @@ class OverlayService : Service() {
     private var cropOverlayView: CropSelectorView? = null
 
     private val stepsList = mutableListOf<MacroStep>()
+    private val scriptRunner = ScriptRunner()
     private val scope = CoroutineScope(Dispatchers.Default)
 
     private var isRunningLoop = false
@@ -76,17 +81,13 @@ class OverlayService : Service() {
         }
         val notification = NotificationCompat.Builder(this, channelId)
             .setContentTitle("Apex Macro Studio Active")
-            .setContentText("محرك الأتمتة والتقاط البكسلات يعمل في الخلفية")
+            .setContentText("محرك الأتمتة وجافا سكريبت يعمل في الخلفية")
             .setSmallIcon(android.R.drawable.ic_menu_camera)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(
-                1001,
-                notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
-            )
+            startForeground(1001, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
         } else {
             startForeground(1001, notification)
         }
@@ -110,6 +111,21 @@ class OverlayService : Service() {
             gravity = Gravity.TOP or Gravity.START
             x = 50
             y = 220
+        }
+    }
+
+    private fun setKeyboardFocusable(focusable: Boolean) {
+        if (!isAttached || !::rootContainer.isInitialized) return
+        try {
+            val params = rootContainer.layoutParams as WindowManager.LayoutParams
+            if (focusable) {
+                params.flags = params.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
+            } else {
+                params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+            }
+            windowManager.updateViewLayout(rootContainer, params)
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 
@@ -149,6 +165,7 @@ class OverlayService : Service() {
         rootContainer.addView(bubbleView)
         rootContainer.addView(suitePanel)
 
+        // حركة سلسة مع تقييد صارم لحدود شاشة الهاتف (Realme GT Master Edition)
         bubbleView.setOnTouchListener(object : View.OnTouchListener {
             private var initialX = 0
             private var initialY = 0
@@ -157,6 +174,9 @@ class OverlayService : Service() {
             private var downTime = 0L
 
             override fun onTouch(v: View, event: MotionEvent): Boolean {
+                val screenW = ScreenCaptureManager.screenWidth
+                val screenH = ScreenCaptureManager.screenHeight
+
                 when (event.action) {
                     MotionEvent.ACTION_DOWN -> {
                         initialX = params.x
@@ -167,8 +187,13 @@ class OverlayService : Service() {
                         return true
                     }
                     MotionEvent.ACTION_MOVE -> {
-                        params.x = initialX + (event.rawX - touchX).toInt()
-                        params.y = initialY + (event.rawY - touchY).toInt()
+                        val newX = initialX + (event.rawX - touchX).toInt()
+                        val newY = initialY + (event.rawY - touchY).toInt()
+
+                        // منع الخروج من حدود الشاشة
+                        params.x = max(0, min(newX, screenW - rootContainer.width))
+                        params.y = max(0, min(newY, screenH - rootContainer.height))
+
                         if (isAttached) windowManager.updateViewLayout(rootContainer, params)
                         return true
                     }
@@ -189,9 +214,11 @@ class OverlayService : Service() {
     }
 
     private fun renderMainJobsView() {
+        setKeyboardFocusable(false)
         suitePanel.removeAllViews()
         val density = resources.displayMetrics.density
 
+        // الشريط العلوي
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -214,16 +241,26 @@ class OverlayService : Service() {
         header.addView(btnClose)
         suitePanel.addView(header)
 
+        // حاوية التمرير للبطاقات
         val scrollView = ScrollView(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                (240 * density).toInt()
+                (250 * density).toInt()
             ).apply { topMargin = (8 * density).toInt(); bottomMargin = (8 * density).toInt() }
         }
 
         val cardsContainer = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
 
         stepsList.forEachIndexed { index, step ->
+            val cardWrapper = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { topMargin = (8 * density).toInt() }
+            }
+
+            // البطاقة البنفسجية الاحترافية
             val card = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding((12 * density).toInt(), (10 * density).toInt(), (12 * density).toInt(), (10 * density).toInt())
@@ -232,21 +269,79 @@ class OverlayService : Service() {
                     setColor(Color.parseColor("#C084FC"))
                 }
                 background = cBg
+            }
+
+            // شريط التحكم بالترتيب والاختبار السريع بالأعلى
+            val controlBar = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { topMargin = (8 * density).toInt() }
-                setOnClickListener { showStepContextMenu(index) }
+                ).apply { bottomMargin = (4 * density).toInt() }
             }
 
+            val stepTitle = TextView(this).apply {
+                text = "${index + 1}. ${step.name}"
+                setTextColor(Color.parseColor("#1E1B4B"))
+                textSize = 12f
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                setOnClickListener { showActionSettingsDialog(index) } // تعديل الاسم والسرعة
+            }
+
+            // أزرار التحريك لأعلى ولأسفل
+            val btnUp = TextView(this).apply {
+                text = "▲"
+                textSize = 12f
+                setPadding((4 * density).toInt(), 0, (4 * density).toInt(), 0)
+                setTextColor(Color.parseColor("#312E81"))
+                setOnClickListener { moveStep(index, -1) }
+            }
+            val btnDown = TextView(this).apply {
+                text = "▼"
+                textSize = 12f
+                setPadding((4 * density).toInt(), 0, (4 * density).toInt(), 0)
+                setTextColor(Color.parseColor("#312E81"))
+                setOnClickListener { moveStep(index, 1) }
+            }
+
+            // زر اختبار هذا الأكشن على حدى
+            val btnTestSingle = TextView(this).apply {
+                text = "▶"
+                textSize = 12f
+                setTextColor(Color.parseColor("#065F46"))
+                setPadding((6 * density).toInt(), 0, (6 * density).toInt(), 0)
+                setOnClickListener { executeSingleStep(step) }
+            }
+
+            // زر حذف الخطوة
+            val btnDelete = TextView(this).apply {
+                text = "🗑"
+                textSize = 12f
+                setPadding((4 * density).toInt(), 0, (2 * density).toInt(), 0)
+                setOnClickListener {
+                    stepsList.removeAt(index)
+                    renderMainJobsView()
+                }
+            }
+
+            controlBar.addView(stepTitle)
+            controlBar.addView(btnTestSingle)
+            controlBar.addView(btnUp)
+            controlBar.addView(btnDown)
+            controlBar.addView(btnDelete)
+
+            // السطر الأول: Click [Thumbnail] [Delay] + زر فتح محرر JS
             val rowTop = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
             }
+
             val txtClick = TextView(this).apply {
                 text = "Click "
                 setTextColor(Color.parseColor("#1E1B4B"))
-                textSize = 14f
+                textSize = 13f
                 typeface = android.graphics.Typeface.DEFAULT_BOLD
             }
             rowTop.addView(txtClick)
@@ -254,30 +349,44 @@ class OverlayService : Service() {
             if (step.thumbnail != null) {
                 val thumb = ImageView(this).apply {
                     setImageBitmap(step.thumbnail)
-                    val s = (22 * density).toInt()
+                    val s = (24 * density).toInt()
                     layoutParams = LinearLayout.LayoutParams(s, s)
                 }
                 rowTop.addView(thumb)
             }
 
             val txtDelay = TextView(this).apply {
-                text = " [X1] [Delay ${step.delayBeforeMs}ms/${step.delayAfterMs}ms]"
+                text = " [X${step.repeatCount}] [${step.delayAfterMs}ms]"
                 setTextColor(Color.parseColor("#312E81"))
                 textSize = 11f
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             }
             rowTop.addView(txtDelay)
 
+            // زر محرر جافا سكريبت المخصص لهذا الأكشن
+            val btnJs = Button(this).apply {
+                text = "{JS}"
+                textSize = 10f
+                setTextColor(Color.WHITE)
+                setBackgroundColor(Color.parseColor("#7C3AED"))
+                val btnSize = (32 * density).toInt()
+                layoutParams = LinearLayout.LayoutParams(btnSize, (24 * density).toInt())
+                setOnClickListener { openJsEditor(index) }
+            }
+            rowTop.addView(btnJs)
+
+            // السطر الثاني: الفرع └ Image [Thumbnail] [Appear] [70%] [Scope]
             val rowSub = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
-                setPadding((12 * density).toInt(), (4 * density).toInt(), 0, 0)
+                setPadding((8 * density).toInt(), (4 * density).toInt(), 0, 0)
+                setOnClickListener { showBranchSettingsDialog(index) } // ضغطة تفتح إعدادات الفرع
             }
 
             val txtBranch = TextView(this).apply {
                 text = "└ Image "
                 setTextColor(Color.parseColor("#1E1B4B"))
-                textSize = 12f
+                textSize = 11f
                 typeface = android.graphics.Typeface.DEFAULT_BOLD
             }
             rowSub.addView(txtBranch)
@@ -298,20 +407,23 @@ class OverlayService : Service() {
             }
 
             val txtCondition = TextView(this).apply {
-                text = " [Appear] [${step.similarityPercent}%] [$scopeName]"
+                text = " [Appear] [${step.similarityPercent}%] [$scopeName] ⚙"
                 setTextColor(Color.parseColor("#312E81"))
                 textSize = 10f
             }
             rowSub.addView(txtCondition)
 
+            card.addView(controlBar)
             card.addView(rowTop)
             card.addView(rowSub)
-            cardsContainer.addView(card)
+            cardWrapper.addView(card)
+            cardsContainer.addView(cardWrapper)
         }
 
         scrollView.addView(cardsContainer)
         suitePanel.addView(scrollView)
 
+        // الأزرار السفلية
         val btnAddAction = Button(this).apply {
             text = "➕ Click Image (اقتطاع صورة جديدة)"
             setTextColor(Color.WHITE)
@@ -321,7 +433,7 @@ class OverlayService : Service() {
                 setColor(Color.parseColor("#7C3AED"))
             }
             background = bg
-            setOnClickListener { showRubberBandSelector() }
+            setOnClickListener { showRubberBandSelector(isRegionOnly = false, targetIndex = -1) }
         }
 
         val btnRunJob = Button(this).apply {
@@ -348,7 +460,76 @@ class OverlayService : Service() {
         suitePanel.addView(btnRunJob)
     }
 
-    private fun showStepContextMenu(index: Int) {
+    // 1. محرر JavaScript الكامل المخصص لكل خطوة مع زر الرجوع
+    private fun openJsEditor(index: Int) {
+        setKeyboardFocusable(true)
+        suitePanel.removeAllViews()
+        val density = resources.displayMetrics.density
+        val step = stepsList[index]
+
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, 0, 0, (8 * density).toInt())
+        }
+
+        val btnBack = TextView(this).apply {
+            text = "← رجوع"
+            setTextColor(Color.parseColor("#00F0FF"))
+            textSize = 14f
+            setOnClickListener { renderMainJobsView() }
+        }
+
+        val title = TextView(this).apply {
+            text = " محرر JS: ${step.name}"
+            setTextColor(Color.WHITE)
+            textSize = 13f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            gravity = Gravity.CENTER
+        }
+
+        header.addView(btnBack)
+        header.addView(title)
+        suitePanel.addView(header)
+
+        val editCode = EditText(this).apply {
+            setText(step.customScript)
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#0B0F19"))
+            setPadding((10 * density).toInt(), (10 * density).toInt(), (10 * density).toInt(), (10 * density).toInt())
+            textSize = 11f
+            typeface = android.graphics.Typeface.MONOSPACE
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (140 * density).toInt()
+            )
+            addTextChangedListener(CodeSyntaxHighlighter())
+        }
+        suitePanel.addView(editCode)
+
+        val btnSave = Button(this).apply {
+            text = "💾 حفظ الكود للأكشن"
+            setTextColor(Color.WHITE)
+            textSize = 12f
+            setBackgroundColor(Color.parseColor("#10B981"))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = (8 * density).toInt() }
+            setOnClickListener {
+                step.customScript = editCode.text.toString()
+                val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+                imm.hideSoftInputFromWindow(windowToken, 0)
+                renderMainJobsView()
+            }
+        }
+        suitePanel.addView(btnSave)
+    }
+
+    // 2. إعدادات الأكشن السريعة (الاسم، سرعة الضغط، تغيير الصورة من المكتبة أو الشريط)
+    private fun showActionSettingsDialog(index: Int) {
+        setKeyboardFocusable(true)
         val step = stepsList[index]
         suitePanel.removeAllViews()
         val density = resources.displayMetrics.density
@@ -358,115 +539,127 @@ class OverlayService : Service() {
             setTextColor(Color.parseColor("#A855F7"))
             textSize = 14f
             typeface = android.graphics.Typeface.DEFAULT_BOLD
-            setPadding(0, 0, 0, (10 * density).toInt())
         }
         suitePanel.addView(title)
 
-        fun createMenuItem(title: String, icon: String, onClick: () -> Unit): Button {
-            return Button(this).apply {
-                text = "$icon  $title"
-                setTextColor(Color.WHITE)
-                textSize = 12f
-                gravity = Gravity.START or Gravity.CENTER_VERTICAL
-                val bg = GradientDrawable().apply {
-                    cornerRadius = 10 * density
-                    setColor(Color.parseColor("#1E293B"))
-                }
-                background = bg
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    (42 * density).toInt()
-                ).apply { topMargin = (5 * density).toInt() }
-                setOnClickListener { onClick() }
+        val editName = EditText(this).apply {
+            hint = "اسم الأكشن"
+            setText(step.name)
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#1E293B"))
+            setPadding(16, 12, 16, 12)
+        }
+        suitePanel.addView(editName)
+
+        val editDelay = EditText(this).apply {
+            hint = "التأخير الزمني (ms)"
+            setText(step.delayAfterMs.toString())
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#1E293B"))
+            setPadding(16, 12, 16, 12)
+        }
+        suitePanel.addView(editDelay)
+
+        // زر إعادة أخذ صورة جديدة بالإطار
+        val btnRetake = Button(this).apply {
+            text = "📷 أخذ صورة جديدة بالإطار"
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#0284C7"))
+            setOnClickListener {
+                showRubberBandSelector(isRegionOnly = false, targetIndex = index)
             }
         }
+        suitePanel.addView(btnRetake)
 
-        suitePanel.addView(createMenuItem("Edit Detect Location", "📍") {
-            showDetectLocationDialog(index)
-        })
-
-        suitePanel.addView(createMenuItem("Edit Similarity %", "🎯") {
-            step.similarityPercent = if (step.similarityPercent == 70) 85 else 70
-            Toast.makeText(this, "تم تغيير نسبة التطابق إلى ${step.similarityPercent}%", Toast.LENGTH_SHORT).show()
-            renderMainJobsView()
-        })
-
-        suitePanel.addView(createMenuItem("Test Condition", "▶") {
-            testCurrentCondition(step)
-        })
-
-        suitePanel.addView(createMenuItem("Delete Action", "🗑") {
-            stepsList.removeAt(index)
-            renderMainJobsView()
-        })
-
-        val btnBack = Button(this).apply {
-            text = "رجوع"
-            setTextColor(Color.parseColor("#94A3B8"))
-            setBackgroundColor(Color.TRANSPARENT)
-            setOnClickListener { renderMainJobsView() }
+        // زر حفظ الإعدادات
+        val btnSave = Button(this).apply {
+            text = "حفظ"
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#10B981"))
+            setOnClickListener {
+                step.name = editName.text.toString()
+                step.delayAfterMs = editDelay.text.toString().toLongOrNull() ?: 500L
+                renderMainJobsView()
+            }
         }
-        suitePanel.addView(btnBack)
+        suitePanel.addView(btnSave)
     }
 
-    private fun showDetectLocationDialog(index: Int) {
+    // 3. إعدادات الفرع (دقة التطابق، ونطاق البحث الثلاثي + Custom Region الشفاف)
+    private fun showBranchSettingsDialog(index: Int) {
         val step = stepsList[index]
         suitePanel.removeAllViews()
         val density = resources.displayMetrics.density
 
         val title = TextView(this).apply {
-            text = "Detect Location"
+            text = "Detect Settings (إعدادات الفرع)"
             setTextColor(Color.WHITE)
-            textSize = 16f
+            textSize = 15f
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
-            setPadding(0, 0, 0, (10 * density).toInt())
         }
         suitePanel.addView(title)
 
-        val radioGroup = RadioGroup(this)
-
-        val rbCaptured = RadioButton(this).apply {
-            text = "Captured Location\n[${step.targetArea.left.toInt()}, ${step.targetArea.top.toInt()}, ${step.targetArea.width().toInt()}, ${step.targetArea.height().toInt()}] [1080x2400]"
+        // تعديل نسبة التطابق
+        val txtSim = TextView(this).apply {
+            text = "نسبة التطابق: ${step.similarityPercent}%"
+            setTextColor(Color.parseColor("#A855F7"))
+            setPadding(0, 8, 0, 4)
+        }
+        val editSim = EditText(this).apply {
+            setText(step.similarityPercent.toString())
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
             setTextColor(Color.WHITE)
-            textSize = 12f
+            setBackgroundColor(Color.parseColor("#1E293B"))
+            setPadding(16, 10, 16, 10)
+        }
+        suitePanel.addView(txtSim)
+        suitePanel.addView(editSim)
+
+        // النطاقات الثلاثة
+        val rg = RadioGroup(this)
+        val rbCap = RadioButton(this).apply {
+            text = "Captured Location (المكان الأصلي)"
+            setTextColor(Color.WHITE)
             isChecked = step.detectScope == DetectScope.CAPTURED_LOCATION
         }
-        val rbCustom = RadioButton(this).apply {
-            text = "Custom Region"
-            setTextColor(Color.WHITE)
-            textSize = 12f
-            isChecked = step.detectScope == DetectScope.CUSTOM_REGION
-        }
         val rbFull = RadioButton(this).apply {
-            text = "Full Screen"
+            text = "Full Screen (كامل الشاشة)"
             setTextColor(Color.WHITE)
-            textSize = 12f
             isChecked = step.detectScope == DetectScope.FULL_SCREEN
         }
-
-        radioGroup.addView(rbCaptured)
-        radioGroup.addView(rbCustom)
-        radioGroup.addView(rbFull)
-        suitePanel.addView(radioGroup)
-
-        val desc = TextView(this).apply {
-            text = "Detection will run at exactly where the template object is captured thus achieve the highest performance."
-            setTextColor(Color.parseColor("#94A3B8"))
-            textSize = 10f
-            setPadding((6 * density).toInt(), (10 * density).toInt(), (6 * density).toInt(), (10 * density).toInt())
+        val rbCustom = RadioButton(this).apply {
+            text = "Custom Region (منطقة مخصصة بالإطار)"
+            setTextColor(Color.WHITE)
+            isChecked = step.detectScope == DetectScope.CUSTOM_REGION
         }
-        suitePanel.addView(desc)
+        rg.addView(rbCap)
+        rg.addView(rbFull)
+        rg.addView(rbCustom)
+        suitePanel.addView(rg)
+
+        // زر لفتح الإطار المخصص إذا اختار Custom Region
+        val btnDefineRegion = Button(this).apply {
+            text = "📐 تحديد منطقة البحث المخصصة"
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#F59E0B"))
+            setOnClickListener {
+                showRubberBandSelector(isRegionOnly = true, targetIndex = index)
+            }
+        }
+        suitePanel.addView(btnDefineRegion)
 
         val btnSave = Button(this).apply {
             text = "SAVE"
-            setTextColor(Color.parseColor("#C084FC"))
-            setBackgroundColor(Color.TRANSPARENT)
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#7C3AED"))
             setOnClickListener {
+                step.similarityPercent = editSim.text.toString().toIntOrNull() ?: 70
                 step.detectScope = when {
-                    rbCaptured.isChecked -> DetectScope.CAPTURED_LOCATION
-                    rbCustom.isChecked -> DetectScope.CUSTOM_REGION
-                    else -> DetectScope.FULL_SCREEN
+                    rbCap.isChecked -> DetectScope.CAPTURED_LOCATION
+                    rbFull.isChecked -> DetectScope.FULL_SCREEN
+                    else -> DetectScope.CUSTOM_REGION
                 }
                 renderMainJobsView()
             }
@@ -474,22 +667,35 @@ class OverlayService : Service() {
         suitePanel.addView(btnSave)
     }
 
-    private fun testCurrentCondition(step: MacroStep) {
-        val currentScreen = ScreenCaptureManager.captureCurrentScreen()
-        if (currentScreen != null) {
-            val result = ImageMatcher.findTarget(step, currentScreen)
-            Toast.makeText(
-                this,
-                if (result.isMatched) "✓ تم العثور على الهدف! بنسبة تطابق ${result.currentSimilarity}%"
-                else "✕ لم يتم العثور على الهدف (التطابق: ${result.currentSimilarity}%)",
-                Toast.LENGTH_SHORT
-            ).show()
-        } else {
-            Toast.makeText(this, "تعذر التقاط الشاشة", Toast.LENGTH_SHORT).show()
+    private fun moveStep(index: Int, direction: Int) {
+        val target = index + direction
+        if (target in 0 until stepsList.size) {
+            val item = stepsList.removeAt(index)
+            stepsList.add(target, item)
+            renderMainJobsView()
         }
     }
 
-    private fun showRubberBandSelector() {
+    private fun executeSingleStep(step: MacroStep) {
+        scope.launch {
+            val screen = ScreenCaptureManager.captureCurrentScreen()
+            if (screen != null) {
+                val match = ImageMatcher.findTarget(step, screen)
+                if (match.isMatched && match.targetCenter != null) {
+                    ApexAccessibilityService.instance?.performClick(match.targetCenter.x, match.targetCenter.y)
+                    Toast.makeText(applicationContext, "✓ نُفّذ بنجاح: تطابق ${match.currentSimilarity}%", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(applicationContext, "✕ لم يُعثر على الهدف (تطابق ${match.currentSimilarity}%)", Toast.LENGTH_SHORT).show()
+                }
+            }
+            // تنفيذ سكريبت الجافا سكريبت المرتبط بالخطوة إن وجد
+            if (step.customScript.isNotBlank()) {
+                scriptRunner.execute(step.customScript, step.stepNumber, step.targetArea.centerX(), step.targetArea.centerY())
+            }
+        }
+    }
+
+    private fun showRubberBandSelector(isRegionOnly: Boolean, targetIndex: Int) {
         togglePanelExpansion(false)
         if (cropOverlayView != null) return
 
@@ -500,28 +706,43 @@ class OverlayService : Service() {
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             else
                 @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_PHONE,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT
         )
 
         val cropView = CropSelectorView(
             this,
+            isRegionSelectionOnly = isRegionOnly,
             onConfirm = { selectedRect, _ ->
-                val realCapturedBitmap = ScreenCaptureManager.cropAreaFromScreen(selectedRect)
-
-                val nextNum = stepsList.size + 1
-                val newStep = MacroStep(
-                    stepNumber = nextNum,
-                    name = "Click Image ($nextNum)",
-                    type = ActionType.CLICK_IMAGE,
-                    targetArea = RectF(selectedRect),
-                    thumbnail = realCapturedBitmap,
-                    similarityPercent = 70,
-                    detectScope = DetectScope.CAPTURED_LOCATION
-                )
-                stepsList.add(newStep)
-
-                Toast.makeText(this, "تم التقاط بكسلات الهدف الحقيقية بنجاح!", Toast.LENGTH_SHORT).show()
+                if (isRegionOnly && targetIndex != -1) {
+                    // تحديد Custom Region للبحث فقط
+                    stepsList[targetIndex].customRegion = RectF(selectedRect)
+                    stepsList[targetIndex].detectScope = DetectScope.CUSTOM_REGION
+                    Toast.makeText(this, "تم حفظ منطقة البحث المخصصة بنجاح!", Toast.LENGTH_SHORT).show()
+                } else if (targetIndex != -1) {
+                    // إعادة التقاط الصورة لنفس الأكشن
+                    val realBitmap = ScreenCaptureManager.cropAreaFromScreen(selectedRect)
+                    stepsList[targetIndex].thumbnail = realBitmap
+                    stepsList[targetIndex].targetArea = RectF(selectedRect)
+                    Toast.makeText(this, "تم تحديث صورة الأكشن بنجاح!", Toast.LENGTH_SHORT).show()
+                } else {
+                    // أكشن جديد كامل
+                    val realBitmap = ScreenCaptureManager.cropAreaFromScreen(selectedRect)
+                    val nextNum = stepsList.size + 1
+                    val newStep = MacroStep(
+                        stepNumber = nextNum,
+                        name = "Click Image $nextNum",
+                        type = ActionType.CLICK_IMAGE,
+                        targetArea = RectF(selectedRect),
+                        targetImageName = "target_$nextNum",
+                        thumbnail = realBitmap,
+                        similarityPercent = 70,
+                        detectScope = DetectScope.CAPTURED_LOCATION
+                    )
+                    ImageLibrary.saveTarget("target_$nextNum", realBitmap)
+                    stepsList.add(newStep)
+                    Toast.makeText(this, "تم التقاط الهدف بدقة تامة!", Toast.LENGTH_SHORT).show()
+                }
                 removeRubberBandSelector()
                 togglePanelExpansion(true)
             },
@@ -546,17 +767,29 @@ class OverlayService : Service() {
         isRunningLoop = true
         scope.launch {
             while (isRunningLoop) {
+                // تنفيذ كل الأكشنات بالتسلسل الصارم
                 for (step in stepsList) {
                     if (!isRunningLoop) break
                     if (!step.enabled) continue
 
+                    // 1. البحث بالنقر والمطابقة
                     val screen = ScreenCaptureManager.captureCurrentScreen()
                     if (screen != null) {
                         val match = ImageMatcher.findTarget(step, screen)
                         if (match.isMatched && match.targetCenter != null) {
-                            ApexAccessibilityService.instance?.performClick(match.targetCenter.x, match.targetCenter.y)
+                            for (r in 0 until step.repeatCount) {
+                                ApexAccessibilityService.instance?.performClick(match.targetCenter.x, match.targetCenter.y)
+                                Thread.sleep(60)
+                            }
                         }
                     }
+
+                    // 2. تشغيل كود جافا سكريبت الخاص بالخطوة
+                    if (step.customScript.isNotBlank()) {
+                        scriptRunner.execute(step.customScript, step.stepNumber, step.targetArea.centerX(), step.targetArea.centerY())
+                    }
+
+                    // 3. الانتظار الزمني للأكشن قبل الانتقال للأكشن التالي
                     Thread.sleep(step.delayAfterMs)
                 }
             }
@@ -573,6 +806,7 @@ class OverlayService : Service() {
             suitePanel.visibility = View.VISIBLE
             renderMainJobsView()
         } else {
+            setKeyboardFocusable(false)
             suitePanel.visibility = View.GONE
             bubbleView.visibility = View.VISIBLE
         }
