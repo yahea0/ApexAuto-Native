@@ -48,7 +48,8 @@ object ImageLibrary {
     }
 
     private fun loadAllFromDisk() {
-        val files = storageDir?.listFiles() ?: return
+        val dir = storageDir ?: return
+        val files = dir.listFiles() ?: return
         for (file in files) {
             if (file.isFile && file.extension.equals("png", ignoreCase = true)) {
                 val name = file.nameWithoutExtension
