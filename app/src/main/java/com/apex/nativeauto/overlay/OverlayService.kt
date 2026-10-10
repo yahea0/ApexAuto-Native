@@ -1,11 +1,11 @@
 package com.apex.nativeauto.overlay
 
-import android.app.Notification
+import android.app.Activity
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
-import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.RectF
@@ -50,20 +50,46 @@ class OverlayService : Service() {
         buildOverlayUI()
     }
 
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        startForegroundServiceNotification()
+
+        val resultCode = intent?.getIntExtra("EXTRA_RESULT_CODE", Activity.RESULT_CANCELED) ?: Activity.RESULT_CANCELED
+        val data = intent?.getParcelableExtra<Intent>("EXTRA_DATA")
+
+        if (resultCode == Activity.RESULT_OK && data != null) {
+            try {
+                ScreenCaptureManager.init(this, resultCode, data)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
+        return START_STICKY
+    }
+
     private fun startForegroundServiceNotification() {
         val channelId = "ApexCaptureChannel"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(channelId, "Apex Macro Overlay", NotificationManager.IMPORTANCE_LOW)
             val manager = getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(channel)
+            manager?.createNotificationChannel(channel)
         }
         val notification = NotificationCompat.Builder(this, channelId)
             .setContentTitle("Apex Macro Studio Active")
             .setContentText("محرك الأتمتة والتقاط البكسلات يعمل في الخلفية")
             .setSmallIcon(android.R.drawable.ic_menu_camera)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
 
-        startForeground(1001, notification)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                1001,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+            )
+        } else {
+            startForeground(1001, notification)
+        }
     }
 
     private fun getOverlayLayoutParams(): WindowManager.LayoutParams {
@@ -92,7 +118,6 @@ class OverlayService : Service() {
         rootContainer = FrameLayout(this)
         val density = resources.displayMetrics.density
 
-        // الزر العائم النيون ⚡
         bubbleView = TextView(this).apply {
             text = "⚡"
             textSize = 18f
@@ -107,7 +132,6 @@ class OverlayService : Service() {
             layoutParams = FrameLayout.LayoutParams((44 * density).toInt(), (44 * density).toInt())
         }
 
-        // النافذة العائمة الموسعة
         suitePanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             visibility = View.GONE
@@ -164,12 +188,10 @@ class OverlayService : Service() {
         renderMainJobsView()
     }
 
-    // بناء الواجهة الرئيسية وعرض البطاقات البنفسجية كالصورة رقم 3
     private fun renderMainJobsView() {
         suitePanel.removeAllViews()
         val density = resources.displayMetrics.density
 
-        // شريط العنوان
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -192,7 +214,6 @@ class OverlayService : Service() {
         header.addView(btnClose)
         suitePanel.addView(header)
 
-        // حاوية التمرير للبطاقات البنفسجية
         val scrollView = ScrollView(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -203,23 +224,21 @@ class OverlayService : Service() {
         val cardsContainer = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
 
         stepsList.forEachIndexed { index, step ->
-            // البطاقة البنفسجية الفخمة مثل صورة Macrorify رقم 3 تماماً!
             val card = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding((12 * density).toInt(), (10 * density).toInt(), (12 * density).toInt(), (10 * density).toInt())
                 val cBg = GradientDrawable().apply {
                     cornerRadius = 14 * density
-                    setColor(Color.parseColor("#C084FC")) // بنفسجي Macrorify الفاتح
+                    setColor(Color.parseColor("#C084FC"))
                 }
                 background = cBg
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 ).apply { topMargin = (8 * density).toInt() }
-                setOnClickListener { showStepContextMenu(index) } // ضغطة تفتح خيارات الصورة 2
+                setOnClickListener { showStepContextMenu(index) }
             }
 
-            // السطر الأول: Click [Thumbnail] [Delay]
             val rowTop = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
@@ -249,7 +268,6 @@ class OverlayService : Service() {
             }
             rowTop.addView(txtDelay)
 
-            // السطر الثاني: شرط الظهور والموقع [Appear] [70%] [Captured Location]
             val rowSub = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
@@ -294,7 +312,6 @@ class OverlayService : Service() {
         scrollView.addView(cardsContainer)
         suitePanel.addView(scrollView)
 
-        // الأزرار السفلية
         val btnAddAction = Button(this).apply {
             text = "➕ Click Image (اقتطاع صورة جديدة)"
             setTextColor(Color.WHITE)
@@ -331,7 +348,6 @@ class OverlayService : Service() {
         suitePanel.addView(btnRunJob)
     }
 
-    // القائمة المنبثقة للخيارات عند الضغط على البطاقة (الصورة رقم 2)
     private fun showStepContextMenu(index: Int) {
         val step = stepsList[index]
         suitePanel.removeAllViews()
@@ -366,7 +382,7 @@ class OverlayService : Service() {
         }
 
         suitePanel.addView(createMenuItem("Edit Detect Location", "📍") {
-            showDetectLocationDialog(index) // فتح نافذة الخيارات الثلاثة (الصورة 1)
+            showDetectLocationDialog(index)
         })
 
         suitePanel.addView(createMenuItem("Edit Similarity %", "🎯") {
@@ -393,7 +409,6 @@ class OverlayService : Service() {
         suitePanel.addView(btnBack)
     }
 
-    // نافذة اختيار نطاق البحث الثلاثة طبق الأصل من صورتك الأولى (Detect Location Dialog)
     private fun showDetectLocationDialog(index: Int) {
         val step = stepsList[index]
         suitePanel.removeAllViews()
@@ -435,7 +450,6 @@ class OverlayService : Service() {
         radioGroup.addView(rbFull)
         suitePanel.addView(radioGroup)
 
-        // النص التوضيحي بالأسفل مثل الصورة تماماً
         val desc = TextView(this).apply {
             text = "Detection will run at exactly where the template object is captured thus achieve the highest performance."
             setTextColor(Color.parseColor("#94A3B8"))
@@ -493,7 +507,6 @@ class OverlayService : Service() {
         val cropView = CropSelectorView(
             this,
             onConfirm = { selectedRect, _ ->
-                // التقاط بكسلات الشاشة الحقيقية من تحت الإطار المطاطي!
                 val realCapturedBitmap = ScreenCaptureManager.cropAreaFromScreen(selectedRect)
 
                 val nextNum = stepsList.size + 1
@@ -502,7 +515,7 @@ class OverlayService : Service() {
                     name = "Click Image ($nextNum)",
                     type = ActionType.CLICK_IMAGE,
                     targetArea = RectF(selectedRect),
-                    thumbnail = realCapturedBitmap, // الصورة الحقيقية الفعلية
+                    thumbnail = realCapturedBitmap,
                     similarityPercent = 70,
                     detectScope = DetectScope.CAPTURED_LOCATION
                 )
