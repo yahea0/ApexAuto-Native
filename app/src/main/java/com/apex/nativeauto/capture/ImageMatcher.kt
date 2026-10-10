@@ -8,16 +8,19 @@ import com.apex.nativeauto.macro.MacroStep
 
 object ImageMatcher {
 
+    private var isYoloInitialized = false
+
     init {
         try {
             System.loadLibrary("apex_vision")
-            Log.i("Apex_ImageMatcher", "تم تحميل محرك C++ و OpenCV بنجاح عبر JNI!")
+            Log.i("Apex_ImageMatcher", "تم تحميل مكتبة C++ (YOLOv12 & OpenCV) بنجاح!")
         } catch (e: UnsatisfiedLinkError) {
-            Log.e("Apex_ImageMatcher", "فشل تحميل مكتبة C++: ${e.message}")
+            Log.e("Apex_ImageMatcher", "فشل تحميل المكتبة الأصلية: ${e.message}")
         }
     }
 
-    // الدالة الأصلية في C++
+    external fun nativeInitYOLO(modelPath: String): Boolean
+
     private external fun nativeMatchWithOpenCV(
         screenBitmap: Bitmap,
         templateBitmap: Bitmap,
@@ -26,7 +29,12 @@ object ImageMatcher {
         roiX: Int, roiY: Int, roiW: Int, roiH: Int
     ): FloatArray
 
-    // فحص الهدف بالاعتماد الكامل على C++ و OpenCV
+    fun setupYOLOModel(modelPath: String) {
+        if (!isYoloInitialized) {
+            isYoloInitialized = nativeInitYOLO(modelPath)
+        }
+    }
+
     fun findTarget(step: MacroStep, screenBitmap: Bitmap): MatchResult {
         val template = step.thumbnail ?: return MatchResult(false, null, 0)
 
