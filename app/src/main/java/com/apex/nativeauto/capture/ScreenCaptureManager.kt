@@ -3,30 +3,35 @@ package com.apex.nativeauto.capture
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.RectF
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
+import android.media.Image
 import android.media.ImageReader
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
 import android.os.Handler
-import android.os.Looper
+import android.os.HandlerThread
 import android.util.DisplayMetrics
 import android.view.WindowManager
+import kotlinx.coroutines.delay
 import kotlin.math.max
 
 object ScreenCaptureManager {
     var mediaProjection: MediaProjection? = null
     private var virtualDisplay: VirtualDisplay? = null
     private var imageReader: ImageReader? = null
+    private var backgroundThread: HandlerThread? = null
+    private var backgroundHandler: Handler? = null
 
     var screenWidth = 1080
     var screenHeight = 2400
     private var screenDensity = 420
 
     @Volatile
-    private var latestCleanBitmap: Bitmap? = null
+    var latestCleanBitmap: Bitmap? = null
 
     fun init(context: Context, resultCode: Int, data: Intent) {
         val mpManager = context.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
@@ -40,82 +45,107 @@ object ScreenCaptureManager {
         screenHeight = metrics.heightPixels
         screenDensity = metrics.densityDpi
 
+        // تشغيل خيط معالجة خلفي مستقل لمنع حجب الإطارات في هواتف ريلمي
+        if (backgroundThread == null) {
+            backgroundThread = HandlerThread("ApexScreenCaptureThread").apply { start() }
+            backgroundHandler = Handler(backgroundThread!!.looper)
+        }
+
         imageReader = ImageReader.newInstance(screenWidth, screenHeight, PixelFormat.RGBA_8888, 4)
         
-        // مستمع دائم لتحديث لقطة الشاشة ورفض الإطارات السوداء
         imageReader?.setOnImageAvailableListener({ reader ->
             try {
                 val image = reader.acquireLatestImage() ?: return@setOnImageAvailableListener
-                val plane = image.planes[0]
-                val buffer = plane.buffer
-                buffer.rewind()
-
-                val pixelStride = plane.pixelStride
-                val rowStride = plane.rowStride
-                val rowPadding = rowStride - pixelStride * screenWidth
-
-                val raw = Bitmap.createBitmap(
-                    screenWidth + rowPadding / pixelStride,
-                    screenHeight,
-                    Bitmap.Config.ARGB_8888
-                )
-                raw.copyPixelsFromBuffer(buffer)
-                image.close()
-
-                val clean = if (rowPadding == 0) raw else Bitmap.createBitmap(raw, 0, 0, screenWidth, screenHeight)
-
-                // فحص الإطار: إذا لم يكن إطاراً أسود بالكامل نحتفظ به فوراً
-                if (!isBitmapPureBlack(clean)) {
-                    synchronized(this) {
-                        latestCleanBitmap = clean
-                    }
-                }
+                processImage(image)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
-        }, Handler(Looper.getMainLooper()))
+        }, backgroundHandler)
 
         virtualDisplay = mediaProjection?.createVirtualDisplay(
             "ApexScreenCapture",
             screenWidth, screenHeight, screenDensity,
             DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-            imageReader?.surface, null, null
+            imageReader?.surface, null, backgroundHandler
         )
     }
 
-    private fun isBitmapPureBlack(bmp: Bitmap): Boolean {
-        // فحص عينات من منتصف وأطراف الصورة
-        val c = bmp.getPixel(bmp.width / 2, bmp.height / 2)
-        val c1 = bmp.getPixel(bmp.width / 4, bmp.height / 4)
-        val c2 = bmp.getPixel(bmp.width * 3 / 4, bmp.height * 3 / 4)
-        return (c == 0 || c == -16777216) && (c1 == 0 || c1 == -16777216) && (c2 == 0 || c2 == -16777216)
+    private fun processImage(image: Image) {
+        try {
+            val plane = image.planes[0]
+            val buffer = plane.buffer
+            buffer.rewind()
+
+            val pixelStride = plane.pixelStride
+            val rowStride = plane.rowStride
+            val rowPadding = rowStride - pixelStride * screenWidth
+
+            val raw = Bitmap.createBitmap(
+                screenWidth + rowPadding / pixelStride,
+                screenHeight,
+                Bitmap.Config.ARGB_8888
+            )
+            raw.copyPixelsFromBuffer(buffer)
+
+            val clean = if (rowPadding == 0) raw else Bitmap.createBitmap(raw, 0, 0, screenWidth, screenHeight)
+
+            // فحص الإطار: رفض الإطارات السوداء تماماً
+            if (!isBitmapBlack(clean)) {
+                synchronized(this) {
+                    latestCleanBitmap = clean
+                }
+            }
+        } finally {
+            image.close()
+        }
     }
 
-    fun captureCurrentScreen(): Bitmap? {
-        // محاولة جلب أحدث لقطة حقيقية محفوظة
-        synchronized(this) {
-            if (latestCleanBitmap != null && !latestCleanBitmap!!.isRecycled) {
-                return latestCleanBitmap!!.copy(Bitmap.Config.ARGB_8888, false)
+    private fun isBitmapBlack(bmp: Bitmap): Boolean {
+        val stepX = max(1, bmp.width / 10)
+        val stepY = max(1, bmp.height / 10)
+        for (x in stepX until bmp.width step stepX) {
+            for (y in stepY until bmp.height step stepY) {
+                val pixel = bmp.getPixel(x, y)
+                val r = Color.red(pixel)
+                val g = Color.green(pixel)
+                val b = Color.blue(pixel)
+                val a = Color.alpha(pixel)
+                // إذا وجدنا بكسلاً ملوّناً فالإطار حقيقي وغير أسود
+                if (a > 0 && (r > 15 || g > 15 || b > 15)) {
+                    return false
+                }
             }
         }
-        Thread.sleep(80)
+        return true
+    }
+
+    // انتظار وصول لقطة شاشة ملونة حقيقية
+    suspend fun getRealScreenshot(timeoutMs: Long = 1000): Bitmap? {
+        val start = System.currentTimeMillis()
+        while (System.currentTimeMillis() - start < timeoutMs) {
+            synchronized(this) {
+                if (latestCleanBitmap != null && !latestCleanBitmap!!.isRecycled && !isBitmapBlack(latestCleanBitmap!!)) {
+                    return latestCleanBitmap!!.copy(Bitmap.Config.ARGB_8888, false)
+                }
+            }
+            delay(40)
+        }
         return latestCleanBitmap?.copy(Bitmap.Config.ARGB_8888, false)
     }
 
-    // قص الهدف بدقة تامة من الإطار الحقيقي
-    fun cropAreaFromScreen(cropRect: RectF): Bitmap {
-        val fullScreenshot = captureCurrentScreen()
+    suspend fun cropAreaFromScreen(cropRect: RectF): Bitmap {
+        val fullScreenshot = getRealScreenshot()
 
         val left = max(0, cropRect.left.toInt().coerceAtMost(screenWidth - 1))
         val top = max(0, cropRect.top.toInt().coerceAtMost(screenHeight - 1))
         val width = max(1, cropRect.width().toInt().coerceAtMost(screenWidth - left))
         val height = max(1, cropRect.height().toInt().coerceAtMost(screenHeight - top))
 
-        return if (fullScreenshot != null) {
+        return if (fullScreenshot != null && !isBitmapBlack(fullScreenshot)) {
             Bitmap.createBitmap(fullScreenshot, left, top, width, height)
         } else {
             Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).apply {
-                eraseColor(android.graphics.Color.DKGRAY)
+                eraseColor(Color.parseColor("#151722"))
             }
         }
     }
