@@ -638,7 +638,6 @@ class OverlayService : Service() {
         }
         suitePanel.addView(editDelay)
 
-        // تدريب الذكاء الاصطناعي على زوايا أخرى
         val txtTraining = TextView(this).apply {
             text = "🧠 تدريب الذكاء الاصطناعي على زوايا أخرى (${step.trainedVariations.size} زوايا إضافية):"
             setTextColor(Color.parseColor("#FFD700"))
@@ -799,13 +798,13 @@ class OverlayService : Service() {
             }
         }
         val icon = TextView(this).apply { textSize = 12f }
-        val text = TextView(this).apply {
+        val labelTextView = TextView(this).apply {
             this.text = "Full Screen (كامل الشاشة للبحث عن الهدف وزواياه)"
             setTextColor(Color.WHITE)
             textSize = 11f
         }
         cardFull.addView(icon)
-        cardFull.addView(text)
+        cardFull.addView(labelTextView)
         cardScopeContainer.addView(cardFull)
         suitePanel.addView(cardScopeContainer)
 
