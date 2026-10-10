@@ -16,7 +16,6 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.util.DisplayMetrics
 import android.view.WindowManager
-import kotlinx.coroutines.delay
 import kotlin.math.max
 
 object ScreenCaptureManager {
@@ -45,14 +44,13 @@ object ScreenCaptureManager {
         screenHeight = metrics.heightPixels
         screenDensity = metrics.densityDpi
 
-        // تشغيل خيط معالجة خلفي مستقل لمنع حجب الإطارات في هواتف ريلمي
         if (backgroundThread == null) {
             backgroundThread = HandlerThread("ApexScreenCaptureThread").apply { start() }
             backgroundHandler = Handler(backgroundThread!!.looper)
         }
 
         imageReader = ImageReader.newInstance(screenWidth, screenHeight, PixelFormat.RGBA_8888, 4)
-        
+
         imageReader?.setOnImageAvailableListener({ reader ->
             try {
                 val image = reader.acquireLatestImage() ?: return@setOnImageAvailableListener
@@ -89,7 +87,6 @@ object ScreenCaptureManager {
 
             val clean = if (rowPadding == 0) raw else Bitmap.createBitmap(raw, 0, 0, screenWidth, screenHeight)
 
-            // فحص الإطار: رفض الإطارات السوداء تماماً
             if (!isBitmapBlack(clean)) {
                 synchronized(this) {
                     latestCleanBitmap = clean
@@ -110,7 +107,6 @@ object ScreenCaptureManager {
                 val g = Color.green(pixel)
                 val b = Color.blue(pixel)
                 val a = Color.alpha(pixel)
-                // إذا وجدنا بكسلاً ملوّناً فالإطار حقيقي وغير أسود
                 if (a > 0 && (r > 15 || g > 15 || b > 15)) {
                     return false
                 }
@@ -119,8 +115,8 @@ object ScreenCaptureManager {
         return true
     }
 
-    // انتظار وصول لقطة شاشة ملونة حقيقية
-    suspend fun getRealScreenshot(timeoutMs: Long = 1000): Bitmap? {
+    // دالة عادية متزامنة لتفادي أخطاء الـ Coroutine
+    fun getRealScreenshot(timeoutMs: Long = 800): Bitmap? {
         val start = System.currentTimeMillis()
         while (System.currentTimeMillis() - start < timeoutMs) {
             synchronized(this) {
@@ -128,12 +124,12 @@ object ScreenCaptureManager {
                     return latestCleanBitmap!!.copy(Bitmap.Config.ARGB_8888, false)
                 }
             }
-            delay(40)
+            Thread.sleep(30)
         }
         return latestCleanBitmap?.copy(Bitmap.Config.ARGB_8888, false)
     }
 
-    suspend fun cropAreaFromScreen(cropRect: RectF): Bitmap {
+    fun cropAreaFromScreen(cropRect: RectF): Bitmap {
         val fullScreenshot = getRealScreenshot()
 
         val left = max(0, cropRect.left.toInt().coerceAtMost(screenWidth - 1))
