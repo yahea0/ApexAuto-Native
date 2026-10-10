@@ -3,6 +3,7 @@ package com.apex.nativeauto
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.graphics.BitmapFactory
 import android.media.projection.MediaProjectionManager
 import android.net.Uri
 import android.os.Build
@@ -24,7 +25,6 @@ class MainActivity : AppCompatActivity() {
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK && result.data != null) {
-            // تمرير الإذن للخدمة لتبدأ كـ Foreground Service وفق معايير أندرويد 14
             val serviceIntent = Intent(this, OverlayService::class.java).apply {
                 putExtra("EXTRA_RESULT_CODE", result.resultCode)
                 putExtra("EXTRA_DATA", result.data)
@@ -33,6 +33,25 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "تم تفعيل محرك الذكاء الاصطناعي بنجاح!", Toast.LENGTH_SHORT).show()
         } else {
             Toast.makeText(this, "يلزم السماح بالتقاط الشاشة لاقتطاع الصور وفحصها", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    // منتقي الصور من معرض الهاتف
+    private val galleryLauncher = registerForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                contentResolver.openInputStream(uri)?.use { stream ->
+                    val bitmap = BitmapFactory.decodeStream(stream)
+                    if (bitmap != null) {
+                        OverlayService.addGalleryTarget(bitmap)
+                        Toast.makeText(this, "تم استيراد الصورة بنجاح إلى الأكشن!", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } catch (e: Exception) {
+                Toast.makeText(this, "فشل استيراد الصورة من المعرض", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
@@ -58,6 +77,18 @@ class MainActivity : AppCompatActivity() {
 
             val mpManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
             captureLauncher.launch(mpManager.createScreenCaptureIntent())
+        }
+
+        // استقبال طلب فتح المعرض من النافذة العائمة
+        if (intent?.getBooleanExtra("OPEN_GALLERY", false) == true) {
+            galleryLauncher.launch("image/*")
+        }
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        if (intent?.getBooleanExtra("OPEN_GALLERY", false) == true) {
+            galleryLauncher.launch("image/*")
         }
     }
 
