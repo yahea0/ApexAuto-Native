@@ -27,6 +27,8 @@ import java.io.FileOutputStream
 
 class MainActivity : AppCompatActivity() {
 
+    private var targetMode = "VISUAL" // أو "PRO_CODE"
+
     private val captureLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -34,11 +36,10 @@ class MainActivity : AppCompatActivity() {
             val serviceIntent = Intent(this, OverlayService::class.java).apply {
                 putExtra("EXTRA_RESULT_CODE", result.resultCode)
                 putExtra("EXTRA_DATA", result.data)
+                putExtra("EXTRA_MODE", targetMode)
             }
             ContextCompat.startForegroundService(this, serviceIntent)
-            Toast.makeText(this, "تم تفعيل محرك الذكاء الاصطناعي بنجاح!", Toast.LENGTH_SHORT).show()
-        } else {
-            Toast.makeText(this, "يلزم السماح بالتقاط الشاشة لاقتطاع الصور وفحصها", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "تم إطلاق الاستوديو بنجاح!", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -71,7 +72,8 @@ class MainActivity : AppCompatActivity() {
         prepareYOLOModel()
 
         val btnAccessibility = findViewById<Button?>(R.id.btn_enable_accessibility)
-        val btnStartOverlay = findViewById<Button?>(R.id.btn_start_overlay)
+        val btnStartVisual = findViewById<Button?>(R.id.btn_start_visual_overlay)
+        val btnStartPro = findViewById<Button?>(R.id.btn_start_pro_overlay)
         val btnOpenLibrary = findViewById<Button?>(R.id.btn_open_library)
 
         btnAccessibility?.setOnClickListener {
@@ -79,14 +81,16 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "قم بتفعيل خدمة ApexAuto Native", Toast.LENGTH_SHORT).show()
         }
 
-        btnStartOverlay?.setOnClickListener {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
-                startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
-                return@setOnClickListener
-            }
+        // تشغيل النمط البصري العادي
+        btnStartVisual?.setOnClickListener {
+            targetMode = "VISUAL"
+            launchOverlayWorkflow()
+        }
 
-            val mpManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-            captureLauncher.launch(mpManager.createScreenCaptureIntent())
+        // تشغيل نمط المحترفين البرمجي الكامل (Pro IDE)
+        btnStartPro?.setOnClickListener {
+            targetMode = "PRO_CODE"
+            launchOverlayWorkflow()
         }
 
         btnOpenLibrary?.setOnClickListener {
@@ -94,7 +98,15 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // نافذة استعراض المستودع وتعديل أسماء الصور وحذفها
+    private fun launchOverlayWorkflow() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+            startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+            return
+        }
+        val mpManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+        captureLauncher.launch(mpManager.createScreenCaptureIntent())
+    }
+
     private fun openLibraryManagerDialog() {
         val dialog = Dialog(this)
         dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
@@ -167,7 +179,6 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            // ضغطة على الاسم تفتح نافذة إعادة تسميته فورياً
             val txt = TextView(this).apply {
                 text = "$name ✏️"
                 setTextColor(Color.WHITE)
