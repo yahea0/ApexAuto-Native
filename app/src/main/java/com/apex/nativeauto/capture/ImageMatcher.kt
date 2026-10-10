@@ -35,9 +35,7 @@ object ImageMatcher {
         }
     }
 
-    // فحص كل الزوايا والأشكال المدربة للهدف
     fun findTarget(step: MacroStep, screenBitmap: Bitmap): MatchResult {
-        // جمع كل الصور المدربة للهدف
         val allTemplates = mutableListOf<Bitmap>()
         step.thumbnail?.let { allTemplates.add(it) }
         allTemplates.addAll(step.trainedVariations)
@@ -57,7 +55,6 @@ object ImageMatcher {
 
         var bestMatch = MatchResult(false, null, 0)
 
-        // تمشيط الشاشة بحثاً عن أي زاوية من الزوايا المدربة
         for (template in allTemplates) {
             try {
                 val res = nativeMatchWithOpenCV(
