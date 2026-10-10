@@ -2,7 +2,7 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#0B0F19"
+    android:background="#0B0C10"
     android:fillViewport="true">
 
     <LinearLayout
@@ -10,102 +10,120 @@
         android:layout_height="wrap_content"
         android:gravity="center_horizontal"
         android:orientation="vertical"
-        android:padding="28dp">
+        android:padding="24dp">
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
+            android:layout_marginTop="16dp"
             android:text="APEX AUTO PRO"
-            android:textColor="#00F0FF"
-            android:textSize="28sp"
+            android:textColor="#FFD700"
+            android:textSize="26sp"
             android:textStyle="bold" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="Next-Gen Autonomous Macro &amp; Vision Studio"
+            android:layout_marginTop="4dp"
+            android:text="AI Multi-Angle Autonomous Studio"
             android:textColor="#94A3B8"
             android:textSize="13sp" />
 
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
-            android:layout_marginVertical="28dp"
+            android:layout_marginVertical="20dp"
             android:background="#1E293B" />
 
-        <!-- بطاقة حالة خدمة النقر الفوري -->
+        <!-- 1. محرك النقر المباشر -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="#131B2E"
+            android:background="#12141D"
             android:orientation="vertical"
-            android:padding="20dp">
+            android:padding="16dp">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="1. محرك النقر المباشر (Core Touch)"
                 android:textColor="#FFFFFF"
-                android:textSize="15sp"
+                android:textSize="14sp"
                 android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="يمنح التطبيق صلاحية إرسال النقرات بدقة الصفر تأخير"
-                android:textColor="#64748B"
-                android:textSize="12sp" />
 
             <Button
                 android:id="@+id/btn_enable_accessibility"
                 android:layout_width="match_parent"
-                android:layout_height="52dp"
-                android:layout_marginTop="14dp"
-                android:backgroundTint="#00F0FF"
-                android:text="⚡ تفعيل خدمة النقر (Accessibility)"
-                android:textColor="#0B0F19"
+                android:layout_height="50dp"
+                android:layout_marginTop="12dp"
+                android:backgroundTint="#FFD700"
+                android:text="⚡ تفعيل خدمة النقر (ACCESSIBILITY)"
+                android:textColor="#0B0C10"
                 android:textStyle="bold" />
-
         </LinearLayout>
 
-        <!-- بطاقة تشغيل استوديو الأتمتة العائم -->
+        <!-- 2. استوديو الأتمتة العائم -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:background="#131B2E"
+            android:layout_marginTop="16dp"
+            android:background="#12141D"
             android:orientation="vertical"
-            android:padding="20dp">
+            android:padding="16dp">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="2. استوديو الأتمتة العائم (Floating Studio)"
                 android:textColor="#FFFFFF"
-                android:textSize="15sp"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/btn_start_overlay"
+                android:layout_width="match_parent"
+                android:layout_height="50dp"
+                android:layout_marginTop="12dp"
+                android:backgroundTint="#10B981"
+                android:text="🔘 تشغيل الاستوديو العائم للأتمتة"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- 3. قسم مكتبة ومستودع الصور وتدريب الذكاء الاصطناعي (NEW) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="#12141D"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="3. مستودع الصور وإدارة الأهداف (Targets Library)"
+                android:textColor="#FFD700"
+                android:textSize="14sp"
                 android:textStyle="bold" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:text="يفتح الأيقونة العائمة، شريط تحديد الأهداف، ومحرر JavaScript"
+                android:text="استعراض الأهداف المحفوظة، إعادة تسميتها، وحذفها أو إضافة صور جديدة"
                 android:textColor="#64748B"
-                android:textSize="12sp" />
+                android:textSize="11sp" />
 
             <Button
-                android:id="@+id/btn_start_overlay"
+                android:id="@+id/btn_open_library"
                 android:layout_width="match_parent"
-                android:layout_height="52dp"
-                android:layout_marginTop="14dp"
-                android:backgroundTint="#10B981"
-                android:text="🔘 تشغيل الاستوديو العائم للأتمتة"
-                android:textColor="#FFFFFF"
+                android:layout_height="50dp"
+                android:layout_marginTop="12dp"
+                android:backgroundTint="#1F222E"
+                android:text="📁 إدارة مستودع الصور والأهداف"
+                android:textColor="#FFD700"
                 android:textStyle="bold" />
-
         </LinearLayout>
 
     </LinearLayout>
