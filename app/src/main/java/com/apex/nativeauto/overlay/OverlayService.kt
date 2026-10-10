@@ -30,7 +30,6 @@ import com.apex.nativeauto.macro.*
 import com.apex.nativeauto.picker.TransparentPickerActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.max
@@ -453,7 +452,7 @@ class OverlayService : Service() {
         scrollView.addView(cardsContainer)
         suitePanel.addView(scrollView)
 
-        // الأزرار السفلية (المستودع والمعرض)
+        // الأزرار السفلية
         val buttonsRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = LinearLayout.LayoutParams(
@@ -493,7 +492,6 @@ class OverlayService : Service() {
                 marginStart = (4 * density).toInt()
             }
             setOnClickListener {
-                // فتح المعرض بشفافية فوق اللعبة دون مغادرتها
                 val intent = Intent(this@OverlayService, TransparentPickerActivity::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
@@ -527,7 +525,6 @@ class OverlayService : Service() {
         suitePanel.addView(btnRunJob)
     }
 
-    // نافذة اختيار هدف من مستودع التطبيق المحفوظ دون مغادرة اللعبة
     private fun showInAppTargetPicker() {
         val targets = ImageLibrary.targetImages
         if (targets.isEmpty()) {
@@ -605,7 +602,6 @@ class OverlayService : Service() {
         suitePanel.addView(btnBack)
     }
 
-    // إعدادات الأكشن مع تدريب الذكاء الاصطناعي على زوايا متعددة
     fun showActionSettingsDialog(index: Int) {
         setKeyboardFocusable(true)
         val step = stepsList[index]
@@ -639,7 +635,6 @@ class OverlayService : Service() {
         }
         suitePanel.addView(editDelay)
 
-        // قسم التدريب المتعدد للذكاء الاصطناعي
         val txtTraining = TextView(this).apply {
             text = "🧠 تدريب الذكاء الاصطناعي على زوايا أخرى (${step.trainedVariations.size} زوايا إضافية):"
             setTextColor(Color.parseColor("#FFD700"))
@@ -714,10 +709,10 @@ class OverlayService : Service() {
     }
 
     private fun testSingleActionWithAutoPeek(step: MacroStep) {
-        rootContainer.visibility = View.GONE
+        suitePanel.visibility = View.GONE
+        bubbleView.visibility = View.VISIBLE
 
         scope.launch {
-            delay(150)
             val screen = ScreenCaptureManager.getRealScreenshot()
             mainHandler.post {
                 if (screen != null) {
@@ -730,7 +725,7 @@ class OverlayService : Service() {
                     }
                 }
                 mainHandler.postDelayed({
-                    rootContainer.visibility = View.VISIBLE
+                    togglePanelExpansion(true)
                 }, 1400)
             }
         }
