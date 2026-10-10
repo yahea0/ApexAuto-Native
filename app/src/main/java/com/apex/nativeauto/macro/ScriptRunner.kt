@@ -3,7 +3,6 @@ package com.apex.nativeauto.macro
 import android.accessibilityservice.AccessibilityService
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import android.widget.Toast
 import com.apex.nativeauto.accessibility.ApexAccessibilityService
 import com.apex.nativeauto.capture.ImageMatcher
@@ -16,6 +15,7 @@ import org.mozilla.javascript.ScriptableObject
 class ScriptRunner {
 
     private val mainHandler = Handler(Looper.getMainLooper())
+    var onLiveLogEmitted: ((String) -> Unit)? = null
 
     fun execute(code: String, stepNum: Int, targetX: Float, targetY: Float): Boolean {
         return try {
@@ -27,7 +27,7 @@ class ScriptRunner {
             ScriptableObject.putProperty(scope, "x", targetX)
             ScriptableObject.putProperty(scope, "y", targetY)
 
-            // 1. دالة النقر بالإحداثيات: click(x, y)
+            // دالة النقر
             val clickFunc = object : BaseFunction() {
                 override fun call(cx: Context?, scope: Scriptable?, thisObj: Scriptable?, args: Array<out Any>?): Any {
                     if (args != null && args.size >= 2) {
@@ -40,7 +40,7 @@ class ScriptRunner {
             }
             ScriptableObject.putProperty(scope, "click", clickFunc)
 
-            // 2. دالة البحث عن صورة: findImage("target_name", 70)
+            // دالة البحث عن صورة
             val findImageFunc = object : BaseFunction() {
                 override fun call(cx: Context?, scope: Scriptable?, thisObj: Scriptable?, args: Array<out Any>?): Any {
                     val name = args?.getOrNull(0)?.toString() ?: ""
@@ -74,7 +74,7 @@ class ScriptRunner {
             }
             ScriptableObject.putProperty(scope, "findImage", findImageFunc)
 
-            // 3. دالة النقر المباشر على صورة إذا وُجدت: clickImage("target_name", 70)
+            // دالة النقر المباشر على صورة
             val clickImageFunc = object : BaseFunction() {
                 override fun call(cx: Context?, scope: Scriptable?, thisObj: Scriptable?, args: Array<out Any>?): Any {
                     val name = args?.getOrNull(0)?.toString() ?: ""
@@ -101,7 +101,7 @@ class ScriptRunner {
             }
             ScriptableObject.putProperty(scope, "clickImage", clickImageFunc)
 
-            // 4. دالة الانتظار: sleep(ms)
+            // دالة الانتظار
             val sleepFunc = object : BaseFunction() {
                 override fun call(cx: Context?, scope: Scriptable?, thisObj: Scriptable?, args: Array<out Any>?): Any {
                     if (args != null && args.isNotEmpty()) {
@@ -113,7 +113,18 @@ class ScriptRunner {
             }
             ScriptableObject.putProperty(scope, "sleep", sleepFunc)
 
-            // 5. دالة إظهار إشعار: toast("text")
+            // دالة إرسال سجل مباشر (Live Console Log)
+            val logFunc = object : BaseFunction() {
+                override fun call(cx: Context?, scope: Scriptable?, thisObj: Scriptable?, args: Array<out Any>?): Any {
+                    val msg = args?.getOrNull(0)?.toString() ?: ""
+                    mainHandler.post {
+                        onLiveLogEmitted?.invoke(msg)
+                    }
+                    return Context.getUndefinedValue()
+                }
+            }
+            ScriptableObject.putProperty(scope, "log", logFunc)
+
             val toastFunc = object : BaseFunction() {
                 override fun call(cx: Context?, scope: Scriptable?, thisObj: Scriptable?, args: Array<out Any>?): Any {
                     val msg = args?.getOrNull(0)?.toString() ?: ""
@@ -127,7 +138,6 @@ class ScriptRunner {
             }
             ScriptableObject.putProperty(scope, "toast", toastFunc)
 
-            // 6. أزرار النظام: pressBack() و pressHome()
             val backFunc = object : BaseFunction() {
                 override fun call(cx: Context?, scope: Scriptable?, thisObj: Scriptable?, args: Array<out Any>?): Any {
                     ApexAccessibilityService.instance?.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
@@ -144,11 +154,13 @@ class ScriptRunner {
             }
             ScriptableObject.putProperty(scope, "pressHome", homeFunc)
 
-            cx.evaluateString(scope, code, "UserMacroScript", 1, null)
+            cx.evaluateString(scope, code, "ApexMacroRuntime", 1, null)
             Context.exit()
             true
         } catch (e: Exception) {
-            Log.e("Apex_ScriptRunner", "JS Execution Error: ${e.message}")
+            mainHandler.post {
+                onLiveLogEmitted?.invoke("❌ خطأ برمجي: ${e.message}")
+            }
             Context.exit()
             false
         }
