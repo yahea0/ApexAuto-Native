@@ -7,8 +7,10 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.PixelFormat
+import android.graphics.PointF
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -253,7 +255,7 @@ class OverlayService : Service() {
         stepsList.forEachIndexed { index, step ->
             val card = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
-                layoutDirection = View.LAYOUT_DIRECTION_LTR // فرض اتجاه LTR لمنع تشابك العناصر
+                layoutDirection = View.LAYOUT_DIRECTION_LTR
                 setPadding((12 * density).toInt(), (10 * density).toInt(), (12 * density).toInt(), (10 * density).toInt())
                 val cBg = GradientDrawable().apply {
                     cornerRadius = 16 * density
@@ -298,7 +300,7 @@ class OverlayService : Service() {
                     marginEnd = (4 * density).toInt()
                 }
                 setOnClickListener {
-                    testSingleActionWithAutoPeek(step) // يختفي ويختبر ويعود
+                    testSingleActionWithAutoPeek(step)
                 }
             }
 
@@ -448,7 +450,6 @@ class OverlayService : Service() {
         suitePanel.addView(btnRunJob)
     }
 
-    // إخفاء القائمة تلقائياً عند فحص الأكشن لإتاحة رؤية الشاشة ثم إعادتها
     private fun testSingleActionWithAutoPeek(step: MacroStep) {
         suitePanel.visibility = View.GONE
         bubbleView.visibility = View.VISIBLE
@@ -465,7 +466,6 @@ class OverlayService : Service() {
                         Toast.makeText(applicationContext, "✕ لم يُعثر على الهدف (تطابق ${match.currentSimilarity}%)", Toast.LENGTH_SHORT).show()
                     }
                 }
-                // إعادة فتح القائمة بعد ثانية ونصف
                 mainHandler.postDelayed({
                     togglePanelExpansion(true)
                 }, 1400)
@@ -473,7 +473,6 @@ class OverlayService : Service() {
         }
     }
 
-    // نافذة تسمية الهدف بعد الاقتطاع
     private fun showNameTargetDialog(realBitmap: Bitmap, targetArea: RectF) {
         setKeyboardFocusable(true)
         suitePanel.removeAllViews()
@@ -530,9 +529,8 @@ class OverlayService : Service() {
         suitePanel.addView(btnSave)
     }
 
-    // إعدادات الفرع ونطاق البحث الثلاثي بدون أي تعليق
     private fun showBranchSettingsDialog(index: Int) {
-        setKeyboardFocusable(true) // تفعيل الكيبورد لكتابة النسبة
+        setKeyboardFocusable(true)
         val step = stepsList[index]
         suitePanel.removeAllViews()
         val density = resources.displayMetrics.density
@@ -562,7 +560,6 @@ class OverlayService : Service() {
         suitePanel.addView(txtSim)
         suitePanel.addView(editSim)
 
-        // خيارات النطاقات الثلاثة ككروت ذهبية مستقلة تمنع التعليق
         var currentScope = step.detectScope
         val cardScopeContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
