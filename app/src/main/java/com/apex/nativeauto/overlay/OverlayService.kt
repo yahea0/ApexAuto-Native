@@ -30,6 +30,7 @@ import com.apex.nativeauto.macro.*
 import com.apex.nativeauto.picker.TransparentPickerActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.max
@@ -452,7 +453,6 @@ class OverlayService : Service() {
         scrollView.addView(cardsContainer)
         suitePanel.addView(scrollView)
 
-        // الأزرار السفلية
         val buttonsRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = LinearLayout.LayoutParams(
@@ -709,10 +709,10 @@ class OverlayService : Service() {
     }
 
     private fun testSingleActionWithAutoPeek(step: MacroStep) {
-        suitePanel.visibility = View.GONE
-        bubbleView.visibility = View.VISIBLE
+        rootContainer.visibility = View.GONE
 
         scope.launch {
+            delay(150)
             val screen = ScreenCaptureManager.getRealScreenshot()
             mainHandler.post {
                 if (screen != null) {
@@ -725,7 +725,7 @@ class OverlayService : Service() {
                     }
                 }
                 mainHandler.postDelayed({
-                    togglePanelExpansion(true)
+                    rootContainer.visibility = View.VISIBLE
                 }, 1400)
             }
         }
