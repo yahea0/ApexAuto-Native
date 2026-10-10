@@ -1,4 +1,4 @@
-name: Build ApexAuto Full Native C++ (OpenCV & AI)
+name: Build ApexAuto Full AI Engine (YOLOv12 & OpenCV)
 
 on:
   push:
@@ -19,34 +19,57 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
+    - name: Set up Python for YOLOv12 Export
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Generate YOLOv12-N ONNX Model
+      run: |
+        python -m pip install --upgrade pip
+        pip install ultralytics onnx
+        python -c "from ultralytics import YOLO; model = YOLO('yolo12n.pt'); model.export(format='onnx')"
+        mkdir -p app/src/main/assets
+        cp yolo12n.onnx app/src/main/assets/yolov12n.onnx
+
     - name: Setup Android NDK
       uses: nttld/setup-ndk@v1
       with:
         ndk-version: r26b
         link-to-sdk: true
 
-    - name: Download & Setup OpenCV Android SDK
+    - name: Download OpenCV & ONNX Runtime
       run: |
         mkdir -p app/src/main/cpp/third_party/opencv/lib/arm64-v8a
         mkdir -p app/src/main/cpp/third_party/opencv/include
+        mkdir -p app/src/main/cpp/third_party/onnxruntime/lib/arm64-v8a
+        mkdir -p app/src/main/cpp/third_party/onnxruntime/include
 
+        # تنزيل OpenCV
         OPENCV_VERSION="4.9.0"
         curl -L -o opencv.zip https://github.com/opencv/opencv/releases/download/${OPENCV_VERSION}/opencv-${OPENCV_VERSION}-android-sdk.zip
         unzip -q opencv.zip
         cp OpenCV-android-sdk/sdk/native/libs/arm64-v8a/libopencv_java4.so app/src/main/cpp/third_party/opencv/lib/arm64-v8a/
         cp -r OpenCV-android-sdk/sdk/native/jni/include/* app/src/main/cpp/third_party/opencv/include/
 
+        # تنزيل ONNX Runtime
+        ORT_VERSION="1.17.3"
+        curl -L -o ort.aar https://repo1.maven.org/maven2/com/microsoft/onnxruntime/onnxruntime-android/${ORT_VERSION}/onnxruntime-android-${ORT_VERSION}.aar
+        unzip -q ort.aar -d ort_aar
+        cp ort_aar/jni/arm64-v8a/libonnxruntime.so app/src/main/cpp/third_party/onnxruntime/lib/arm64-v8a/
+        cp -r ort_aar/headers/* app/src/main/cpp/third_party/onnxruntime/include/
+
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
       with:
         gradle-version: "8.6"
 
-    - name: Build Full Native APK
+    - name: Build Full AI APK
       run: |
         gradle assembleDebug --stacktrace
 
     - name: Upload Finished APK
       uses: actions/upload-artifact@v4
       with:
-        name: ApexAuto-Native-OpenCV-Debug
+        name: ApexAuto-YOLOv12-OpenCV-Debug
         path: app/build/outputs/apk/debug/app-debug.apk
