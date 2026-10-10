@@ -11,8 +11,8 @@ android {
         applicationId = "com.apex.nativeauto"
         minSdk = 29
         targetSdk = 34
-        versionCode = 2
-        versionName = "2.0.0-PRO"
+        versionCode = 4
+        versionName = "2.2.0-NATIVE-OPENCV"
 
         ndk {
             abiFilters.addAll(setOf("arm64-v8a"))
@@ -20,7 +20,7 @@ android {
 
         externalNativeBuild {
             cmake {
-                cppFlags("-std=c++20 -O3 -fexceptions -frtti -fopenmp")
+                cppFlags("-std=c++20 -O3 -fexceptions -frtti")
                 arguments(
                     "-DANDROID_STL=c++_shared",
                     "-DANDROID_PLATFORM=android-29"
@@ -71,7 +71,5 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("com.google.android.material:material:1.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0")
-    
-    // محرك JavaScript لتشغيل الشروط والأكواد الحسابية المخصصة
     implementation("org.mozilla:rhino:1.7.14")
 }
