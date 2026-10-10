@@ -23,10 +23,13 @@
             </intent-filter>
         </activity>
 
-        <!-- نافذة شفافة لاختيار الصور من المعرض دون مغادرة اللعبة -->
+        <!-- نافذة معزولة تماماً تفتح المعرض فوق اللعبة دون استدعاء MainActivity -->
         <activity
             android:name=".picker.TransparentPickerActivity"
             android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:taskAffinity=""
+            android:excludeFromRecents="true"
+            android:noHistory="true"
             android:exported="false" />
 
         <service
