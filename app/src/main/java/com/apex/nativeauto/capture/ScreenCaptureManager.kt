@@ -7,6 +7,7 @@ import android.graphics.PixelFormat
 import android.graphics.RectF
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
+import android.media.Image
 import android.media.ImageReader
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
@@ -35,7 +36,7 @@ object ScreenCaptureManager {
         screenHeight = metrics.heightPixels
         screenDensity = metrics.densityDpi
 
-        imageReader = ImageReader.newInstance(screenWidth, screenHeight, PixelFormat.RGBA_8888, 2)
+        imageReader = ImageReader.newInstance(screenWidth, screenHeight, PixelFormat.RGBA_8888, 3)
         virtualDisplay = mediaProjection?.createVirtualDisplay(
             "ApexScreenCapture",
             screenWidth, screenHeight, screenDensity,
@@ -44,36 +45,49 @@ object ScreenCaptureManager {
         )
     }
 
-    // التقاط إطار الشاشة النظيف مع تنظيف إزاحة الـ RowPadding
+    // التقاط إطار الشاشة النظيف وتجاوز مشكلة الإطارات الفارغة أو السوداء
     fun captureCurrentScreen(): Bitmap? {
         val reader = imageReader ?: return null
-        val image = reader.acquireLatestImage() ?: return null
+        var image: Image? = null
 
-        val planes = image.planes
-        val buffer = planes[0].buffer
-        val pixelStride = planes[0].pixelStride
-        val rowStride = planes[0].rowStride
-        val rowPadding = rowStride - pixelStride * screenWidth
+        // محاولة جلب أحدث إطار متاح مع انتظار قصير للمزامنة
+        for (i in 0 until 5) {
+            image = reader.acquireLatestImage()
+            if (image != null) break
+            Thread.sleep(25)
+        }
 
-        val rawBitmap = Bitmap.createBitmap(
-            screenWidth + rowPadding / pixelStride,
-            screenHeight,
-            Bitmap.Config.ARGB_8888
-        )
-        rawBitmap.copyPixelsFromBuffer(buffer)
-        image.close()
+        if (image == null) return null
 
-        // استخراج الصورة النظيفة المطابقة لأبعاد الشاشة بالملي
-        return if (rowPadding == 0) {
-            rawBitmap
-        } else {
-            val cleanBitmap = Bitmap.createBitmap(rawBitmap, 0, 0, screenWidth, screenHeight)
-            rawBitmap.recycle()
-            cleanBitmap
+        try {
+            val plane = image.planes[0]
+            val buffer = plane.buffer
+            buffer.rewind() // ضروري جداً لضمان قراءة البكسلات من البداية
+
+            val pixelStride = plane.pixelStride
+            val rowStride = plane.rowStride
+            val rowPadding = rowStride - pixelStride * screenWidth
+
+            val rawBitmap = Bitmap.createBitmap(
+                screenWidth + rowPadding / pixelStride,
+                screenHeight,
+                Bitmap.Config.ARGB_8888
+            )
+            rawBitmap.copyPixelsFromBuffer(buffer)
+
+            return if (rowPadding == 0) {
+                rawBitmap
+            } else {
+                val clean = Bitmap.createBitmap(rawBitmap, 0, 0, screenWidth, screenHeight)
+                rawBitmap.recycle()
+                clean
+            }
+        } finally {
+            image.close()
         }
     }
 
-    // اقتطاع ما داخل الإطار المطاطي فقط بحساب دقيق للبكسلات
+    // قص الهدف بدقة متناهية دون زيادة بكسل واحد
     fun cropAreaFromScreen(cropRect: RectF): Bitmap {
         val fullScreenshot = captureCurrentScreen()
 
