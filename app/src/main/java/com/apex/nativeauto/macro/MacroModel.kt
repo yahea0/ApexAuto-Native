@@ -4,19 +4,27 @@ import android.graphics.Bitmap
 import android.graphics.RectF
 
 enum class ActionType {
-    TAP,            // نقرة إحداثيات
-    IMAGE_TARGET,   // نقرة على صورة/إطار
+    CLICK_IMAGE,    // النقر على صورة
+    TAP_COORDINATE, // نقرة إحداثيات عادية
     JS_SCRIPT       // كود جافا سكريبت شرطي
+}
+
+enum class DetectScope {
+    CAPTURED_LOCATION, // المكان الافتراضي المقتطع
+    CUSTOM_REGION,     // منطقة مخصصة
+    FULL_SCREEN        // كامل الشاشة
 }
 
 data class MacroStep(
     val stepNumber: Int,
     var name: String,
     var type: ActionType,
-    var targetArea: RectF = RectF(500f, 900f, 600f, 1000f),
-    var targetName: String = "",        // اسم الهدف للتعرف عليه في كود الجافا سكريبت
-    var thumbnail: Bitmap? = null,      // الصورة المصغرة للهدف
-    var scriptCode: String = "// كود الأتمتة المخصص\nif (step == 1) {\n    click(x, y);\n    sleep(300);\n}",
-    var delayAfterMs: Long = 400L,
+    var targetArea: RectF = RectF(402f, 781f, 723f, 1019f),
+    var thumbnail: Bitmap? = null,
+    var similarityPercent: Int = 70, // نسبة التطابق الافتراضية 70%
+    var detectScope: DetectScope = DetectScope.CAPTURED_LOCATION,
+    var customRegion: RectF? = null,
+    var delayBeforeMs: Long = 0L,
+    var delayAfterMs: Long = 1000L,
     var enabled: Boolean = true
 )
