@@ -12,8 +12,8 @@ import android.widget.Button
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import com.apex.nativeauto.capture.ImageMatcher
-import com.apex.nativeauto.capture.ScreenCaptureManager
 import com.apex.nativeauto.overlay.OverlayService
 import java.io.File
 import java.io.FileOutputStream
@@ -24,8 +24,12 @@ class MainActivity : AppCompatActivity() {
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK && result.data != null) {
-            ScreenCaptureManager.init(this, result.resultCode, result.data!!)
-            startService(Intent(this, OverlayService::class.java))
+            // تمرير الإذن للخدمة لتبدأ كـ Foreground Service وفق معايير أندرويد 14
+            val serviceIntent = Intent(this, OverlayService::class.java).apply {
+                putExtra("EXTRA_RESULT_CODE", result.resultCode)
+                putExtra("EXTRA_DATA", result.data)
+            }
+            ContextCompat.startForegroundService(this, serviceIntent)
             Toast.makeText(this, "تم تفعيل محرك الذكاء الاصطناعي بنجاح!", Toast.LENGTH_SHORT).show()
         } else {
             Toast.makeText(this, "يلزم السماح بالتقاط الشاشة لاقتطاع الصور وفحصها", Toast.LENGTH_LONG).show()
@@ -36,7 +40,6 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // نسخ وتهيئة نموذج YOLOv12 تلقائياً إلى ذاكرة الهاتف
         prepareYOLOModel()
 
         val btnAccessibility = findViewById<Button>(R.id.btn_enable_accessibility)
