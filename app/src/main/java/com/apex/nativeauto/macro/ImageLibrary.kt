@@ -48,11 +48,14 @@ object ImageLibrary {
     }
 
     private fun loadAllFromDisk() {
-        storageDir?.listFiles { file -> file.extension.lowercase() == "png" }?.forEach { file ->
-            val name = file.nameWithoutExtension
-            val bmp = BitmapFactory.decodeFile(file.absolutePath)
-            if (bmp != null) {
-                targetImages[name] = bmp
+        val files = storageDir?.listFiles() ?: return
+        for (file in files) {
+            if (file.isFile && file.extension.equals("png", ignoreCase = true)) {
+                val name = file.nameWithoutExtension
+                val bmp = BitmapFactory.decodeFile(file.absolutePath)
+                if (bmp != null) {
+                    targetImages[name] = bmp
+                }
             }
         }
     }
