@@ -144,10 +144,10 @@ class OverlayService : Service() {
         rootContainer = FrameLayout(this)
         val density = resources.displayMetrics.density
 
-        // الزر العائم الملكي الذهبي المصغر (48dp)
+        // الزر العائم الملكي الذهبي (48dp)
         bubbleView = TextView(this).apply {
             text = "⚡"
-            textSize = 22f
+            textSize = 20f
             gravity = Gravity.CENTER
             setTextColor(Color.parseColor("#FFD700"))
             val bg = GradientDrawable().apply {
@@ -171,7 +171,7 @@ class OverlayService : Service() {
                 setStroke((2f * density).toInt(), Color.parseColor("#D4AF37"))
             }
             background = bg
-            layoutParams = FrameLayout.LayoutParams((340 * density).toInt(), FrameLayout.LayoutParams.WRAP_CONTENT)
+            layoutParams = FrameLayout.LayoutParams((345 * density).toInt(), FrameLayout.LayoutParams.WRAP_CONTENT)
         }
 
         rootContainer.addView(bubbleView)
@@ -261,7 +261,7 @@ class OverlayService : Service() {
         stepsList.forEachIndexed { index, step ->
             val card = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
-                layoutDirection = View.LAYOUT_DIRECTION_LTR
+                layoutDirection = View.LAYOUT_DIRECTION_LTR // حظر الترتيب المعكوس للغة العربية
                 setPadding((12 * density).toInt(), (10 * density).toInt(), (12 * density).toInt(), (10 * density).toInt())
                 val cBg = GradientDrawable().apply {
                     cornerRadius = 16 * density
@@ -275,7 +275,7 @@ class OverlayService : Service() {
                 ).apply { topMargin = (8 * density).toInt() }
             }
 
-            // الشريط العلوي للبطاقة
+            // السطر 1: عنوان الأكشن وأزرار الترتيب والحذف
             val topBar = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
@@ -289,26 +289,6 @@ class OverlayService : Service() {
                 typeface = Typeface.DEFAULT_BOLD
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                 setOnClickListener { showActionSettingsDialog(index) }
-            }
-
-            // زر فحص واختبار الأكشن المكبر بدون أي اقتطاع
-            val btnTest = Button(this).apply {
-                text = "⚡ فحص"
-                setTextColor(Color.parseColor("#0B0C10"))
-                textSize = 11f
-                typeface = Typeface.DEFAULT_BOLD
-                val bg = GradientDrawable().apply {
-                    cornerRadius = 8 * density
-                    setColor(Color.parseColor("#FFD700"))
-                }
-                background = bg
-                // زيادة العرض لمنع اقتطاع النص نهائياً
-                layoutParams = LinearLayout.LayoutParams((72 * density).toInt(), (32 * density).toInt()).apply {
-                    marginEnd = (6 * density).toInt()
-                }
-                setOnClickListener {
-                    testSingleActionWithAutoPeek(step)
-                }
             }
 
             val btnUp = TextView(this).apply {
@@ -337,19 +317,19 @@ class OverlayService : Service() {
             }
 
             topBar.addView(titleText)
-            topBar.addView(btnTest)
             topBar.addView(btnUp)
             topBar.addView(btnDown)
             topBar.addView(btnDel)
 
-            // سطر تفاصيل النقر والصورة
+            // السطر 2: المعاينة الحقيقية + التفاصيل + زري الفحص والـ JS الواسعين
             val rowClick = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
                 layoutDirection = View.LAYOUT_DIRECTION_LTR
-                setPadding(0, (6 * density).toInt(), 0, 0)
+                setPadding(0, (8 * density).toInt(), 0, 0)
             }
 
+            // الصورة المصغرة (Thumbnail)
             if (step.thumbnail != null) {
                 val thumb = ImageView(this).apply {
                     setImageBitmap(step.thumbnail)
@@ -367,36 +347,60 @@ class OverlayService : Service() {
             }
 
             val txtClick = TextView(this).apply {
-                text = "Click [X${step.repeatCount}] [${step.delayAfterMs}ms]"
+                text = "Click [X${step.repeatCount}]\n[${step.delayAfterMs}ms]"
                 setTextColor(Color.WHITE)
                 textSize = 11f
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             }
             rowClick.addView(txtClick)
 
-            // زر {JS} المكبر الذي يظهر بالكامل
-            val btnJs = Button(this).apply {
+            // زر {JS} الواسع بدون اقتطاع
+            val btnJs = TextView(this).apply {
                 text = "{JS}"
                 textSize = 11f
+                gravity = Gravity.CENTER
                 typeface = Typeface.DEFAULT_BOLD
                 setTextColor(Color.parseColor("#FFD700"))
                 val bBg = GradientDrawable().apply {
-                    cornerRadius = 6 * density
+                    cornerRadius = 8 * density
                     setColor(Color.parseColor("#1F222E"))
                     setStroke(1, Color.parseColor("#D4AF37"))
                 }
                 background = bBg
-                layoutParams = LinearLayout.LayoutParams((48 * density).toInt(), (28 * density).toInt())
+                val w = (44 * density).toInt()
+                val h = (30 * density).toInt()
+                layoutParams = LinearLayout.LayoutParams(w, h).apply { marginEnd = (6 * density).toInt() }
                 setOnClickListener { openJsEditor(index) }
             }
             rowClick.addView(btnJs)
 
-            // سطر الفرع
+            // زر ⚡ فحص الموسع والواضح بالكامل
+            val btnTest = TextView(this).apply {
+                text = "⚡ فحص"
+                textSize = 11f
+                gravity = Gravity.CENTER
+                typeface = Typeface.DEFAULT_BOLD
+                setTextColor(Color.parseColor("#0B0C10"))
+                val bg = GradientDrawable().apply {
+                    cornerRadius = 8 * density
+                    setColor(Color.parseColor("#FFD700"))
+                }
+                background = bg
+                val w = (74 * density).toInt()
+                val h = (30 * density).toInt()
+                layoutParams = LinearLayout.LayoutParams(w, h)
+                setOnClickListener {
+                    testSingleActionWithAutoPeek(step)
+                }
+            }
+            rowClick.addView(btnTest)
+
+            // السطر 3: الفرع
             val rowBranch = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
                 layoutDirection = View.LAYOUT_DIRECTION_LTR
-                setPadding((12 * density).toInt(), (6 * density).toInt(), 0, 0)
+                setPadding((8 * density).toInt(), (6 * density).toInt(), 0, 0)
                 setOnClickListener { showBranchSettingsDialog(index) }
             }
 
@@ -459,31 +463,29 @@ class OverlayService : Service() {
         suitePanel.addView(btnRunJob)
     }
 
-    // إخفاء القائمة فوراً عند فحص الأكشن لإتاحة رؤية الشاشة ثم إعادتها
     private fun testSingleActionWithAutoPeek(step: MacroStep) {
         rootContainer.visibility = View.GONE
 
         scope.launch {
-            delay(200)
+            delay(150)
             val screen = ScreenCaptureManager.captureCurrentScreen()
             mainHandler.post {
                 if (screen != null) {
                     val match = ImageMatcher.findTarget(step, screen)
                     if (match.isMatched && match.targetCenter != null) {
                         ApexAccessibilityService.instance?.performClick(match.targetCenter.x, match.targetCenter.y)
-                        Toast.makeText(applicationContext, "✓ نُفّذ في المنتصف بنجاح! التطابق: ${match.currentSimilarity}%", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(applicationContext, "✓ نُفّذ بنجاح! التطابق: ${match.currentSimilarity}%", Toast.LENGTH_SHORT).show()
                     } else {
                         Toast.makeText(applicationContext, "✕ لم يُعثر على الهدف (تطابق ${match.currentSimilarity}%)", Toast.LENGTH_SHORT).show()
                     }
                 }
                 mainHandler.postDelayed({
                     rootContainer.visibility = View.VISIBLE
-                }, 1500)
+                }, 1400)
             }
         }
     }
 
-    // نافذة تسمية الهدف بعد الاقتطاع
     private fun showNameTargetDialog(realBitmap: Bitmap, targetArea: RectF) {
         setKeyboardFocusable(true)
         suitePanel.removeAllViews()
@@ -540,7 +542,6 @@ class OverlayService : Service() {
         suitePanel.addView(btnSave)
     }
 
-    // إعدادات الفرع بدون أي تعليق مع استجابة فورية
     private fun showBranchSettingsDialog(index: Int) {
         setKeyboardFocusable(true)
         val step = stepsList[index]
@@ -572,7 +573,6 @@ class OverlayService : Service() {
         suitePanel.addView(txtSim)
         suitePanel.addView(editSim)
 
-        // حاوية الكروت الذهبية المستقلة
         var selectedScope = step.detectScope
         val cardScopeContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -610,7 +610,7 @@ class OverlayService : Service() {
                 ).apply { topMargin = (5 * density).toInt() }
                 setOnClickListener {
                     selectedScope = scopeType
-                    updateCardStyles() // استجابة فورية بدون تعليق
+                    updateCardStyles()
                 }
             }
             val icon = TextView(this).apply { textSize = 12f }
