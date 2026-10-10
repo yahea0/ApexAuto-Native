@@ -15,6 +15,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.apex.nativeauto.capture.ImageMatcher
+import com.apex.nativeauto.macro.ImageLibrary
 import com.apex.nativeauto.overlay.OverlayService
 import java.io.File
 import java.io.FileOutputStream
@@ -36,21 +37,17 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // منتقي الصور من معرض الهاتف
-    private val galleryLauncher = registerForActivityResult(
+    private val mainLibraryLauncher = registerForActivityResult(
         ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         if (uri != null) {
-            try {
-                contentResolver.openInputStream(uri)?.use { stream ->
-                    val bitmap = BitmapFactory.decodeStream(stream)
-                    if (bitmap != null) {
-                        OverlayService.addGalleryTarget(bitmap)
-                        Toast.makeText(this, "تم استيراد الصورة بنجاح إلى الأكشن!", Toast.LENGTH_SHORT).show()
-                    }
+            contentResolver.openInputStream(uri)?.use { stream ->
+                val bmp = BitmapFactory.decodeStream(stream)
+                if (bmp != null) {
+                    val count = ImageLibrary.targetImages.size + 1
+                    ImageLibrary.saveTarget("target_$count", bmp)
+                    Toast.makeText(this, "تمت إضافة الصورة إلى المستودع بنجاح!", Toast.LENGTH_SHORT).show()
                 }
-            } catch (e: Exception) {
-                Toast.makeText(this, "فشل استيراد الصورة من المعرض", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -59,17 +56,19 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        ImageLibrary.init(this)
         prepareYOLOModel()
 
-        val btnAccessibility = findViewById<Button>(R.id.btn_enable_accessibility)
-        val btnStartOverlay = findViewById<Button>(R.id.btn_start_overlay)
+        val btnAccessibility = findViewById<Button?>(R.id.btn_enable_accessibility)
+        val btnStartOverlay = findViewById<Button?>(R.id.btn_start_overlay)
+        val btnOpenLibrary = findViewById<Button?>(R.id.btn_open_library)
 
-        btnAccessibility.setOnClickListener {
+        btnAccessibility?.setOnClickListener {
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
             Toast.makeText(this, "قم بتفعيل خدمة ApexAuto Native", Toast.LENGTH_SHORT).show()
         }
 
-        btnStartOverlay.setOnClickListener {
+        btnStartOverlay?.setOnClickListener {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
                 startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
                 return@setOnClickListener
@@ -79,16 +78,8 @@ class MainActivity : AppCompatActivity() {
             captureLauncher.launch(mpManager.createScreenCaptureIntent())
         }
 
-        // استقبال طلب فتح المعرض من النافذة العائمة
-        if (intent?.getBooleanExtra("OPEN_GALLERY", false) == true) {
-            galleryLauncher.launch("image/*")
-        }
-    }
-
-    override fun onNewIntent(intent: Intent?) {
-        super.onNewIntent(intent)
-        if (intent?.getBooleanExtra("OPEN_GALLERY", false) == true) {
-            galleryLauncher.launch("image/*")
+        btnOpenLibrary?.setOnClickListener {
+            mainLibraryLauncher.launch("image/*")
         }
     }
 
