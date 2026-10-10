@@ -10,7 +10,6 @@ import android.content.pm.ServiceInfo
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.PixelFormat
-import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
@@ -24,11 +23,11 @@ import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
 import android.widget.*
 import androidx.core.app.NotificationCompat
-import com.apex.nativeauto.MainActivity
 import com.apex.nativeauto.accessibility.ApexAccessibilityService
 import com.apex.nativeauto.capture.ImageMatcher
 import com.apex.nativeauto.capture.ScreenCaptureManager
 import com.apex.nativeauto.macro.*
+import com.apex.nativeauto.picker.TransparentPickerActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -46,21 +45,32 @@ class OverlayService : Service() {
             instance?.let { service ->
                 service.mainHandler.post {
                     val nextNum = service.stepsList.size + 1
-                    val targetName = "gallery_target_$nextNum"
+                    val targetName = "target_$nextNum"
                     val newStep = MacroStep(
                         stepNumber = nextNum,
                         name = targetName,
                         type = ActionType.CLICK_IMAGE,
-                        targetArea = RectF(200f, 600f, 200f + bitmap.width, 600f + bitmap.height),
                         targetImageName = targetName,
                         thumbnail = bitmap,
                         similarityPercent = 70,
-                        detectScope = DetectScope.FULL_SCREEN // كامل الشاشة تلقائياً لصور المعرض
+                        detectScope = DetectScope.FULL_SCREEN
                     )
                     ImageLibrary.saveTarget(targetName, bitmap)
                     service.stepsList.add(newStep)
                     service.renderMainJobsView()
                     service.togglePanelExpansion(true)
+                }
+            }
+        }
+
+        fun addTrainingVariation(stepIndex: Int, bitmap: Bitmap) {
+            instance?.let { service ->
+                service.mainHandler.post {
+                    if (stepIndex in 0 until service.stepsList.size) {
+                        service.stepsList[stepIndex].trainedVariations.add(bitmap)
+                        Toast.makeText(service.applicationContext, "✓ أضيفت زاوية تدريبية جديدة بنجاح!", Toast.LENGTH_SHORT).show()
+                        service.showActionSettingsDialog(stepIndex)
+                    }
                 }
             }
         }
@@ -70,7 +80,6 @@ class OverlayService : Service() {
     private lateinit var rootContainer: FrameLayout
     private lateinit var bubbleView: TextView
     private lateinit var suitePanel: LinearLayout
-    private var cropOverlayView: CropSelectorView? = null
 
     val stepsList = mutableListOf<MacroStep>()
     private val scriptRunner = ScriptRunner()
@@ -85,6 +94,7 @@ class OverlayService : Service() {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        ImageLibrary.init(this)
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         startForegroundServiceNotification()
         buildOverlayUI()
@@ -149,7 +159,6 @@ class OverlayService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             params.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
         }
-
         return params
     }
 
@@ -173,7 +182,6 @@ class OverlayService : Service() {
         rootContainer = FrameLayout(this)
         val density = resources.displayMetrics.density
 
-        // الزر العائم الملكي الذهبي المصغر (48dp)
         bubbleView = TextView(this).apply {
             text = "⚡"
             textSize = 20f
@@ -188,7 +196,6 @@ class OverlayService : Service() {
             layoutParams = FrameLayout.LayoutParams((48 * density).toInt(), (48 * density).toInt())
         }
 
-        // الجناح الموسع بتصميم أسود ملكي فخم
         suitePanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             visibility = View.GONE
@@ -280,7 +287,7 @@ class OverlayService : Service() {
         val scrollView = ScrollView(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                (240 * density).toInt()
+                (250 * density).toInt()
             ).apply { topMargin = (8 * density).toInt(); bottomMargin = (8 * density).toInt() }
         }
 
@@ -310,15 +317,15 @@ class OverlayService : Service() {
             }
 
             val titleText = TextView(this).apply {
-                text = "${index + 1}. ${step.name}"
+                val anglesCount = step.trainedVariations.size + 1
+                text = "${index + 1}. ${step.name} ($anglesCount زوايا)"
                 setTextColor(Color.parseColor("#FFD700"))
-                textSize = 13f
+                textSize = 12f
                 typeface = Typeface.DEFAULT_BOLD
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                 setOnClickListener { showActionSettingsDialog(index) }
             }
 
-            // زر {JS} الواسع والواضح
             val btnJs = TextView(this).apply {
                 text = "{JS}"
                 textSize = 11f
@@ -337,7 +344,6 @@ class OverlayService : Service() {
                 setOnClickListener { openJsEditor(index) }
             }
 
-            // زر فحص البارز والواضح
             val btnTest = TextView(this).apply {
                 text = "فحص ⚡"
                 textSize = 11f
@@ -352,9 +358,7 @@ class OverlayService : Service() {
                 val w = (68 * density).toInt()
                 val h = (28 * density).toInt()
                 layoutParams = LinearLayout.LayoutParams(w, h).apply { marginEnd = (6 * density).toInt() }
-                setOnClickListener {
-                    testSingleActionWithAutoPeek(step)
-                }
+                setOnClickListener { testSingleActionWithAutoPeek(step) }
             }
 
             val btnUp = TextView(this).apply {
@@ -449,7 +453,7 @@ class OverlayService : Service() {
         scrollView.addView(cardsContainer)
         suitePanel.addView(scrollView)
 
-        // الأزرار السفلية: إتاحة خيارين لإضافة الهدف (اقتطاع بالشريط أو من المعرض)
+        // الأزرار السفلية (المستودع والمعرض)
         val buttonsRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = LinearLayout.LayoutParams(
@@ -458,8 +462,8 @@ class OverlayService : Service() {
             ).apply { topMargin = (4 * density).toInt() }
         }
 
-        val btnAddAction = Button(this).apply {
-            text = "➕ اقتطاع بالشريط"
+        val btnPickFromLibrary = Button(this).apply {
+            text = "📁 من المستودع"
             setTextColor(Color.parseColor("#0B0C10"))
             textSize = 11f
             typeface = Typeface.DEFAULT_BOLD
@@ -471,11 +475,11 @@ class OverlayService : Service() {
             layoutParams = LinearLayout.LayoutParams(0, (44 * density).toInt(), 1f).apply {
                 marginEnd = (4 * density).toInt()
             }
-            setOnClickListener { showRubberBandSelector(isRegionOnly = false, targetIndex = -1) }
+            setOnClickListener { showInAppTargetPicker() }
         }
 
         val btnGalleryAction = Button(this).apply {
-            text = "📁 من المعرض"
+            text = "🖼️ من المعرض"
             setTextColor(Color.WHITE)
             textSize = 11f
             typeface = Typeface.DEFAULT_BOLD
@@ -489,16 +493,15 @@ class OverlayService : Service() {
                 marginStart = (4 * density).toInt()
             }
             setOnClickListener {
-                // فتح المعرض عبر MainActivity
-                val intent = Intent(this@OverlayService, MainActivity::class.java).apply {
+                // فتح المعرض بشفافية فوق اللعبة دون مغادرتها
+                val intent = Intent(this@OverlayService, TransparentPickerActivity::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    putExtra("OPEN_GALLERY", true)
                 }
                 startActivity(intent)
             }
         }
 
-        buttonsRow.addView(btnAddAction)
+        buttonsRow.addView(btnPickFromLibrary)
         buttonsRow.addView(btnGalleryAction)
         suitePanel.addView(buttonsRow)
 
@@ -524,6 +527,192 @@ class OverlayService : Service() {
         suitePanel.addView(btnRunJob)
     }
 
+    // نافذة اختيار هدف من مستودع التطبيق المحفوظ دون مغادرة اللعبة
+    private fun showInAppTargetPicker() {
+        val targets = ImageLibrary.targetImages
+        if (targets.isEmpty()) {
+            Toast.makeText(this, "المستودع فارغ، أضف صوراً من المعرض أولاً", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        suitePanel.removeAllViews()
+        val density = resources.displayMetrics.density
+
+        val title = TextView(this).apply {
+            text = "اختر هدفاً من المستودع"
+            setTextColor(Color.parseColor("#FFD700"))
+            textSize = 14f
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, (8 * density).toInt())
+        }
+        suitePanel.addView(title)
+
+        val scroll = ScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (200 * density).toInt()
+            )
+        }
+        val container = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+
+        targets.forEach { (name, bmp) ->
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding((8 * density).toInt(), (6 * density).toInt(), (8 * density).toInt(), (6 * density).toInt())
+                val bg = GradientDrawable().apply {
+                    cornerRadius = 8 * density
+                    setColor(Color.parseColor("#151722"))
+                    setStroke(1, Color.parseColor("#D4AF37"))
+                }
+                background = bg
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { topMargin = (4 * density).toInt() }
+                setOnClickListener {
+                    addGalleryTarget(bmp)
+                }
+            }
+
+            val img = ImageView(this).apply {
+                setImageBitmap(bmp)
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                layoutParams = LinearLayout.LayoutParams((32 * density).toInt(), (32 * density).toInt()).apply {
+                    marginEnd = (8 * density).toInt()
+                }
+            }
+            val txt = TextView(this).apply {
+                text = name
+                setTextColor(Color.WHITE)
+                textSize = 12f
+            }
+            row.addView(img)
+            row.addView(txt)
+            container.addView(row)
+        }
+
+        scroll.addView(container)
+        suitePanel.addView(scroll)
+
+        val btnBack = Button(this).apply {
+            text = "إلغاء"
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#1F222E"))
+            setOnClickListener { renderMainJobsView() }
+        }
+        suitePanel.addView(btnBack)
+    }
+
+    // إعدادات الأكشن مع تدريب الذكاء الاصطناعي على زوايا متعددة
+    fun showActionSettingsDialog(index: Int) {
+        setKeyboardFocusable(true)
+        val step = stepsList[index]
+        suitePanel.removeAllViews()
+        val density = resources.displayMetrics.density
+
+        val title = TextView(this).apply {
+            text = "إعدادات الأكشن والتدريب الذكي"
+            setTextColor(Color.parseColor("#FFD700"))
+            textSize = 14f
+            typeface = Typeface.DEFAULT_BOLD
+        }
+        suitePanel.addView(title)
+
+        val editName = EditText(this).apply {
+            hint = "اسم الأكشن"
+            setText(step.name)
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#151722"))
+            setPadding(16, 12, 16, 12)
+        }
+        suitePanel.addView(editName)
+
+        val editDelay = EditText(this).apply {
+            hint = "التأخير الزمني ms"
+            setText(step.delayAfterMs.toString())
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#151722"))
+            setPadding(16, 12, 16, 12)
+        }
+        suitePanel.addView(editDelay)
+
+        // قسم التدريب المتعدد للذكاء الاصطناعي
+        val txtTraining = TextView(this).apply {
+            text = "🧠 تدريب الذكاء الاصطناعي على زوايا أخرى (${step.trainedVariations.size} زوايا إضافية):"
+            setTextColor(Color.parseColor("#FFD700"))
+            textSize = 11f
+            setPadding(0, (8 * density).toInt(), 0, (4 * density).toInt())
+        }
+        suitePanel.addView(txtTraining)
+
+        val horizontalScroll = HorizontalScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (45 * density).toInt()
+            )
+        }
+        val trainingContainer = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+
+        step.trainedVariations.forEachIndexed { vIndex, vBmp ->
+            val vImg = ImageView(this).apply {
+                setImageBitmap(vBmp)
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                val bg = GradientDrawable().apply {
+                    cornerRadius = 4 * density
+                    setStroke(1, Color.parseColor("#FFD700"))
+                }
+                background = bg
+                layoutParams = LinearLayout.LayoutParams((36 * density).toInt(), (36 * density).toInt()).apply {
+                    marginEnd = (6 * density).toInt()
+                }
+                setOnLongClickListener {
+                    step.trainedVariations.removeAt(vIndex)
+                    showActionSettingsDialog(index)
+                    true
+                }
+            }
+            trainingContainer.addView(vImg)
+        }
+        horizontalScroll.addView(trainingContainer)
+        suitePanel.addView(horizontalScroll)
+
+        val btnAddVariation = Button(this).apply {
+            text = "➕ إضافة زاوية/شكل جديد للهدف (تدريب AI)"
+            setTextColor(Color.parseColor("#0B0C10"))
+            textSize = 11f
+            typeface = Typeface.DEFAULT_BOLD
+            val bg = GradientDrawable().apply {
+                cornerRadius = 8 * density
+                setColor(Color.parseColor("#FFD700"))
+            }
+            background = bg
+            setOnClickListener {
+                val intent = Intent(this@OverlayService, TransparentPickerActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    putExtra("IS_TRAINING_MODE", true)
+                    putExtra("TARGET_STEP_INDEX", index)
+                }
+                startActivity(intent)
+            }
+        }
+        suitePanel.addView(btnAddVariation)
+
+        val btnSave = Button(this).apply {
+            text = "حفظ"
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#10B981"))
+            setOnClickListener {
+                step.name = editName.text.toString()
+                step.delayAfterMs = editDelay.text.toString().toLongOrNull() ?: 500L
+                renderMainJobsView()
+            }
+        }
+        suitePanel.addView(btnSave)
+    }
+
     private fun testSingleActionWithAutoPeek(step: MacroStep) {
         rootContainer.visibility = View.GONE
 
@@ -537,7 +726,7 @@ class OverlayService : Service() {
                         ApexAccessibilityService.instance?.performClick(match.targetCenter.x, match.targetCenter.y)
                         Toast.makeText(applicationContext, "✓ نُفّذ بنجاح! التطابق: ${match.currentSimilarity}%", Toast.LENGTH_SHORT).show()
                     } else {
-                        Toast.makeText(applicationContext, "✕ لم يُعثر على الهدف (تطابق ${match.currentSimilarity}%)", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(applicationContext, "✕ لم يُعثر على أي من زوايا الهدف (تطابق ${match.currentSimilarity}%)", Toast.LENGTH_SHORT).show()
                     }
                 }
                 mainHandler.postDelayed({
@@ -545,62 +734,6 @@ class OverlayService : Service() {
                 }, 1400)
             }
         }
-    }
-
-    private fun showNameTargetDialog(realBitmap: Bitmap, targetArea: RectF) {
-        setKeyboardFocusable(true)
-        suitePanel.removeAllViews()
-        val density = resources.displayMetrics.density
-
-        val title = TextView(this).apply {
-            text = "تسمية الهدف (Target Name)"
-            setTextColor(Color.parseColor("#FFD700"))
-            textSize = 14f
-            typeface = Typeface.DEFAULT_BOLD
-            gravity = Gravity.CENTER
-        }
-        suitePanel.addView(title)
-
-        val editName = EditText(this).apply {
-            val nextNum = stepsList.size + 1
-            setText("target_$nextNum")
-            setTextColor(Color.WHITE)
-            setBackgroundColor(Color.parseColor("#1F222E"))
-            setPadding(16, 12, 16, 12)
-        }
-        suitePanel.addView(editName)
-
-        val btnSave = Button(this).apply {
-            text = "حفظ الهدف للأكشن"
-            setTextColor(Color.parseColor("#0B0C10"))
-            setBackgroundColor(Color.parseColor("#FFD700"))
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = (8 * density).toInt() }
-            setOnClickListener {
-                val tName = editName.text.toString().trim()
-                val nextNum = stepsList.size + 1
-                val newStep = MacroStep(
-                    stepNumber = nextNum,
-                    name = tName,
-                    type = ActionType.CLICK_IMAGE,
-                    targetArea = RectF(targetArea),
-                    targetImageName = tName,
-                    thumbnail = realBitmap,
-                    similarityPercent = 70,
-                    detectScope = DetectScope.CAPTURED_LOCATION
-                )
-                ImageLibrary.saveTarget(tName, realBitmap)
-                stepsList.add(newStep)
-
-                val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
-                imm.hideSoftInputFromWindow(windowToken, 0)
-
-                renderMainJobsView()
-            }
-        }
-        suitePanel.addView(btnSave)
     }
 
     private fun showBranchSettingsDialog(index: Int) {
@@ -640,71 +773,44 @@ class OverlayService : Service() {
             setPadding(0, (8 * density).toInt(), 0, (8 * density).toInt())
         }
 
-        lateinit var cardCap: LinearLayout
         lateinit var cardFull: LinearLayout
-        lateinit var cardCustom: LinearLayout
 
-        fun updateCardStyles() {
-            fun style(card: LinearLayout, isSel: Boolean) {
-                val bg = GradientDrawable().apply {
-                    cornerRadius = 10 * density
-                    setColor(if (isSel) Color.parseColor("#262214") else Color.parseColor("#151722"))
-                    setStroke(1, if (isSel) Color.parseColor("#FFD700") else Color.parseColor("#333A4D"))
-                }
-                card.background = bg
-                (card.getChildAt(0) as TextView).text = if (isSel) "● " else "○ "
-                (card.getChildAt(0) as TextView).setTextColor(if (isSel) Color.parseColor("#FFD700") else Color.GRAY)
+        fun style(card: LinearLayout, isSel: Boolean) {
+            val bg = GradientDrawable().apply {
+                cornerRadius = 10 * density
+                setColor(if (isSel) Color.parseColor("#262214") else Color.parseColor("#151722"))
+                setStroke(1, if (isSel) Color.parseColor("#FFD700") else Color.parseColor("#333A4D"))
             }
-            style(cardCap, selectedScope == DetectScope.CAPTURED_LOCATION)
-            style(cardFull, selectedScope == DetectScope.FULL_SCREEN)
-            style(cardCustom, selectedScope == DetectScope.CUSTOM_REGION)
+            card.background = bg
+            (card.getChildAt(0) as TextView).text = if (isSel) "● " else "○ "
+            (card.getChildAt(0) as TextView).setTextColor(if (isSel) Color.parseColor("#FFD700") else Color.GRAY)
         }
 
-        fun makeCard(name: String, scopeType: DetectScope): LinearLayout {
-            val card = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding((12 * density).toInt(), (10 * density).toInt(), (12 * density).toInt(), (10 * density).toInt())
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { topMargin = (5 * density).toInt() }
-                setOnClickListener {
-                    selectedScope = scopeType
-                    updateCardStyles()
-                }
+        cardFull = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding((12 * density).toInt(), (10 * density).toInt(), (12 * density).toInt(), (10 * density).toInt())
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = (5 * density).toInt() }
+            setOnClickListener {
+                selectedScope = DetectScope.FULL_SCREEN
+                style(cardFull, true)
             }
-            val icon = TextView(this).apply { textSize = 12f }
-            val text = TextView(this).apply {
-                this.text = name
-                setTextColor(Color.WHITE)
-                textSize = 11f
-            }
-            card.addView(icon)
-            card.addView(text)
-            return card
         }
-
-        cardCap = makeCard("Captured Location (المكان الأصلي)", DetectScope.CAPTURED_LOCATION)
-        cardFull = makeCard("Full Screen (كامل الشاشة)", DetectScope.FULL_SCREEN)
-        cardCustom = makeCard("Custom Region (منطقة مخصصة بالإطار)", DetectScope.CUSTOM_REGION)
-
-        cardScopeContainer.addView(cardCap)
+        val icon = TextView(this).apply { textSize = 12f }
+        val text = TextView(this).apply {
+            this.text = "Full Screen (كامل الشاشة للبحث عن الهدف وزواياه)"
+            setTextColor(Color.WHITE)
+            textSize = 11f
+        }
+        cardFull.addView(icon)
+        cardFull.addView(text)
         cardScopeContainer.addView(cardFull)
-        cardScopeContainer.addView(cardCustom)
         suitePanel.addView(cardScopeContainer)
 
-        updateCardStyles()
-
-        val btnDefineRegion = Button(this).apply {
-            text = "📐 تحديد منطقة البحث المخصصة بالإطار"
-            setTextColor(Color.WHITE)
-            setBackgroundColor(Color.parseColor("#1F222E"))
-            setOnClickListener {
-                showRubberBandSelector(isRegionOnly = true, targetIndex = index)
-            }
-        }
-        suitePanel.addView(btnDefineRegion)
+        style(cardFull, true)
 
         val btnSave = Button(this).apply {
             text = "SAVE"
@@ -717,61 +823,6 @@ class OverlayService : Service() {
             setOnClickListener {
                 step.similarityPercent = editSim.text.toString().toIntOrNull() ?: 70
                 step.detectScope = selectedScope
-                renderMainJobsView()
-            }
-        }
-        suitePanel.addView(btnSave)
-    }
-
-    private fun showActionSettingsDialog(index: Int) {
-        setKeyboardFocusable(true)
-        val step = stepsList[index]
-        suitePanel.removeAllViews()
-        val density = resources.displayMetrics.density
-
-        val title = TextView(this).apply {
-            text = "إعدادات الأكشن: ${step.name}"
-            setTextColor(Color.parseColor("#FFD700"))
-            textSize = 14f
-            typeface = Typeface.DEFAULT_BOLD
-        }
-        suitePanel.addView(title)
-
-        val editName = EditText(this).apply {
-            setText(step.name)
-            setTextColor(Color.WHITE)
-            setBackgroundColor(Color.parseColor("#151722"))
-            setPadding(16, 12, 16, 12)
-        }
-        suitePanel.addView(editName)
-
-        val editDelay = EditText(this).apply {
-            hint = "التأخير الزمني ms"
-            setText(step.delayAfterMs.toString())
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER
-            setTextColor(Color.WHITE)
-            setBackgroundColor(Color.parseColor("#151722"))
-            setPadding(16, 12, 16, 12)
-        }
-        suitePanel.addView(editDelay)
-
-        val btnRetake = Button(this).apply {
-            text = "📷 إعادة أخذ صورة جديدة بالإطار"
-            setTextColor(Color.WHITE)
-            setBackgroundColor(Color.parseColor("#1F222E"))
-            setOnClickListener {
-                showRubberBandSelector(isRegionOnly = false, targetIndex = index)
-            }
-        }
-        suitePanel.addView(btnRetake)
-
-        val btnSave = Button(this).apply {
-            text = "حفظ"
-            setTextColor(Color.parseColor("#0B0C10"))
-            setBackgroundColor(Color.parseColor("#FFD700"))
-            setOnClickListener {
-                step.name = editName.text.toString()
-                step.delayAfterMs = editDelay.text.toString().toLongOrNull() ?: 500L
                 renderMainJobsView()
             }
         }
@@ -843,73 +894,6 @@ class OverlayService : Service() {
         }
     }
 
-    private fun showRubberBandSelector(isRegionOnly: Boolean, targetIndex: Int) {
-        togglePanelExpansion(false)
-        if (cropOverlayView != null) return
-
-        val cropParams = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.MATCH_PARENT,
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            else
-                @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_PHONE,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-            PixelFormat.TRANSLUCENT
-        )
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            cropParams.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
-        }
-
-        val cropView = CropSelectorView(
-            this,
-            isRegionSelectionOnly = isRegionOnly,
-            onConfirm = { selectedRect ->
-                scope.launch {
-                    if (isRegionOnly && targetIndex != -1) {
-                        stepsList[targetIndex].customRegion = RectF(selectedRect)
-                        stepsList[targetIndex].detectScope = DetectScope.CUSTOM_REGION
-                        mainHandler.post {
-                            Toast.makeText(applicationContext, "تم حفظ منطقة البحث المخصصة بنجاح!", Toast.LENGTH_SHORT).show()
-                            removeRubberBandSelector()
-                            togglePanelExpansion(true)
-                        }
-                    } else if (targetIndex != -1) {
-                        val realBitmap = ScreenCaptureManager.cropAreaFromScreen(selectedRect)
-                        stepsList[targetIndex].thumbnail = realBitmap
-                        stepsList[targetIndex].targetArea = RectF(selectedRect)
-                        mainHandler.post {
-                            removeRubberBandSelector()
-                            togglePanelExpansion(true)
-                        }
-                    } else {
-                        val realBitmap = ScreenCaptureManager.cropAreaFromScreen(selectedRect)
-                        mainHandler.post {
-                            removeRubberBandSelector()
-                            togglePanelExpansion(true)
-                            showNameTargetDialog(realBitmap, selectedRect)
-                        }
-                    }
-                }
-            },
-            onCancel = {
-                removeRubberBandSelector()
-                togglePanelExpansion(true)
-            }
-        )
-
-        cropOverlayView = cropView
-        windowManager.addView(cropView, cropParams)
-    }
-
-    private fun removeRubberBandSelector() {
-        cropOverlayView?.let {
-            windowManager.removeView(it)
-            cropOverlayView = null
-        }
-    }
-
     private fun startExecution() {
         isRunningLoop = true
         scope.launch {
@@ -958,7 +942,6 @@ class OverlayService : Service() {
         super.onDestroy()
         instance = null
         stopExecution()
-        removeRubberBandSelector()
         if (isAttached && ::rootContainer.isInitialized) {
             windowManager.removeView(rootContainer)
             isAttached = false
