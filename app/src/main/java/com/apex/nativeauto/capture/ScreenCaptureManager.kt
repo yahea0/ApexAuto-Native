@@ -44,7 +44,7 @@ object ScreenCaptureManager {
         )
     }
 
-    // التقاط إطار الشاشة الحالي كاملاً
+    // التقاط إطار الشاشة النظيف مع تنظيف إزاحة الـ RowPadding
     fun captureCurrentScreen(): Bitmap? {
         val reader = imageReader ?: return null
         val image = reader.acquireLatestImage() ?: return null
@@ -55,34 +55,38 @@ object ScreenCaptureManager {
         val rowStride = planes[0].rowStride
         val rowPadding = rowStride - pixelStride * screenWidth
 
-        val bitmap = Bitmap.createBitmap(
+        val rawBitmap = Bitmap.createBitmap(
             screenWidth + rowPadding / pixelStride,
             screenHeight,
             Bitmap.Config.ARGB_8888
         )
-        bitmap.copyPixelsFromBuffer(buffer)
+        rawBitmap.copyPixelsFromBuffer(buffer)
         image.close()
 
+        // استخراج الصورة النظيفة المطابقة لأبعاد الشاشة بالملي
         return if (rowPadding == 0) {
-            bitmap
+            rawBitmap
         } else {
-            Bitmap.createBitmap(bitmap, 0, 0, screenWidth, screenHeight)
+            val cleanBitmap = Bitmap.createBitmap(rawBitmap, 0, 0, screenWidth, screenHeight)
+            rawBitmap.recycle()
+            cleanBitmap
         }
     }
 
-    // اقتطاع بكسلات الهدف الحقيقية من داخل الإطار المطاطي
+    // اقتطاع ما داخل الإطار المطاطي فقط بحساب دقيق للبكسلات
     fun cropAreaFromScreen(cropRect: RectF): Bitmap {
         val fullScreenshot = captureCurrentScreen()
 
-        val left = max(0, cropRect.left.toInt())
-        val top = max(0, cropRect.top.toInt())
+        val left = max(0, cropRect.left.toInt().coerceAtMost(screenWidth - 1))
+        val top = max(0, cropRect.top.toInt().coerceAtMost(screenHeight - 1))
         val width = max(1, cropRect.width().toInt().coerceAtMost(screenWidth - left))
         val height = max(1, cropRect.height().toInt().coerceAtMost(screenHeight - top))
 
         return if (fullScreenshot != null) {
-            Bitmap.createBitmap(fullScreenshot, left, top, width, height)
+            val cropped = Bitmap.createBitmap(fullScreenshot, left, top, width, height)
+            fullScreenshot.recycle()
+            cropped
         } else {
-            // fallback في حال لم تكن الصلاحية جاهزة
             Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).apply {
                 eraseColor(android.graphics.Color.DKGRAY)
             }
