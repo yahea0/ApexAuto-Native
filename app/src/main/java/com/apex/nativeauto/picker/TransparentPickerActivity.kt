@@ -18,8 +18,8 @@ class TransparentPickerActivity : ComponentActivity() {
                 contentResolver.openInputStream(uri)?.use { stream ->
                     val bitmap: Bitmap? = BitmapFactory.decodeStream(stream)
                     if (bitmap != null) {
-                        val isTrainingMode = intent.getBooleanExtra("IS_TRAINING_MODE", false)
-                        val targetStepIndex = intent.getIntExtra("TARGET_STEP_INDEX", -1)
+                        val isTrainingMode = intent?.getBooleanExtra("IS_TRAINING_MODE", false) ?: false
+                        val targetStepIndex = intent?.getIntExtra("TARGET_STEP_INDEX", -1) ?: -1
 
                         if (isTrainingMode && targetStepIndex != -1) {
                             OverlayService.addTrainingVariation(targetStepIndex, bitmap)
