@@ -51,8 +51,9 @@ class MainActivity : AppCompatActivity() {
                     val bmp = BitmapFactory.decodeStream(stream)
                     if (bmp != null) {
                         val count = ImageLibrary.targetImages.size + 1
-                        ImageLibrary.saveTarget("target_$count", bmp)
-                        Toast.makeText(this, "تمت إضافة هدف جديد إلى المستودع!", Toast.LENGTH_SHORT).show()
+                        val name = "target_$count"
+                        ImageLibrary.saveTarget(name, bmp)
+                        Toast.makeText(this, "تمت إضافة الهدف ($name) بنجاح!", Toast.LENGTH_SHORT).show()
                         openLibraryManagerDialog()
                     }
                 }
@@ -93,7 +94,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // نافذة استعراض وإدارة كل الصور المحفوظة وتعديل أسمائها
+    // نافذة استعراض المستودع وتعديل أسماء الصور وحذفها
     private fun openLibraryManagerDialog() {
         val dialog = Dialog(this)
         dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
@@ -166,11 +167,20 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
+            // ضغطة على الاسم تفتح نافذة إعادة تسميته فورياً
             val txt = TextView(this).apply {
-                text = name
+                text = "$name ✏️"
                 setTextColor(Color.WHITE)
                 textSize = 12f
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                setOnClickListener {
+                    showRenameDialog(name) { newName ->
+                        ImageLibrary.renameTarget(name, newName)
+                        OverlayService.notifyTargetRenamed(name, newName)
+                        dialog.dismiss()
+                        openLibraryManagerDialog()
+                    }
+                }
             }
 
             val btnDel = TextView(this).apply {
@@ -203,6 +213,54 @@ class MainActivity : AppCompatActivity() {
 
         dialog.setContentView(root)
         dialog.show()
+    }
+
+    private fun showRenameDialog(oldName: String, onRenamed: (String) -> Unit) {
+        val d = Dialog(this)
+        d.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+        val density = resources.displayMetrics.density
+
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding((16 * density).toInt(), (16 * density).toInt(), (16 * density).toInt(), (16 * density).toInt())
+            val bg = GradientDrawable().apply {
+                cornerRadius = 16 * density
+                setColor(Color.parseColor("#151722"))
+                setStroke(2, Color.parseColor("#FFD700"))
+            }
+            background = bg
+        }
+
+        val t = TextView(this).apply {
+            text = "تعديل اسم الهدف"
+            setTextColor(Color.parseColor("#FFD700"))
+            textSize = 14f
+        }
+        layout.addView(t)
+
+        val input = EditText(this).apply {
+            setText(oldName)
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#0B0C10"))
+            setPadding(16, 12, 16, 12)
+        }
+        layout.addView(input)
+
+        val btn = Button(this).apply {
+            text = "تأكيد وتحديث في كل مكان"
+            setTextColor(Color.parseColor("#0B0C10"))
+            setBackgroundColor(Color.parseColor("#FFD700"))
+            setOnClickListener {
+                val newName = input.text.toString().trim()
+                if (newName.isNotBlank()) {
+                    onRenamed(newName)
+                    d.dismiss()
+                }
+            }
+        }
+        layout.addView(btn)
+        d.setContentView(layout)
+        d.show()
     }
 
     private fun prepareYOLOModel() {
