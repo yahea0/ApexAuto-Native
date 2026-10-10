@@ -10,6 +10,8 @@ import android.content.pm.ServiceInfo
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.PixelFormat
+import android.graphics.PointF
+import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
@@ -453,6 +455,7 @@ class OverlayService : Service() {
         scrollView.addView(cardsContainer)
         suitePanel.addView(scrollView)
 
+        // الأزرار السفلية
         val buttonsRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = LinearLayout.LayoutParams(
@@ -635,6 +638,7 @@ class OverlayService : Service() {
         }
         suitePanel.addView(editDelay)
 
+        // تدريب الذكاء الاصطناعي على زوايا أخرى
         val txtTraining = TextView(this).apply {
             text = "🧠 تدريب الذكاء الاصطناعي على زوايا أخرى (${step.trainedVariations.size} زوايا إضافية):"
             setTextColor(Color.parseColor("#FFD700"))
