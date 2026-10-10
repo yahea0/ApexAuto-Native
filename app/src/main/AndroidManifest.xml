@@ -23,6 +23,12 @@
             </intent-filter>
         </activity>
 
+        <!-- نافذة شفافة لاختيار الصور من المعرض دون مغادرة اللعبة -->
+        <activity
+            android:name=".picker.TransparentPickerActivity"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:exported="false" />
+
         <service
             android:name=".overlay.OverlayService"
             android:foregroundServiceType="mediaProjection"
