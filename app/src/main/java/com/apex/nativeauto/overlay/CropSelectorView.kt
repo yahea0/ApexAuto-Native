@@ -10,44 +10,43 @@ import android.view.View
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
-import android.widget.TextView
 import android.widget.Toast
 import kotlin.math.max
 
 class CropSelectorView(
     context: Context,
     private val isRegionSelectionOnly: Boolean = false,
-    private val onConfirm: (RectF, Bitmap?) -> Unit,
+    private val onConfirm: (RectF) -> Unit,
     private val onCancel: () -> Unit
 ) : FrameLayout(context) {
 
-    var cropRect = RectF(220f, 600f, 620f, 1000f)
+    var cropRect = RectF(240f, 650f, 640f, 1050f)
     private var activeHandle = -1
     private var lastTouchX = 0f
     private var lastTouchY = 0f
     private val handleRadius = 26f
 
-    private val strokeColor = if (isRegionSelectionOnly) Color.parseColor("#F59E0B") else Color.parseColor("#00F0FF")
+    private val strokeColor = if (isRegionSelectionOnly) Color.parseColor("#F59E0B") else Color.parseColor("#FFD700")
 
     private val strokePaint = Paint().apply {
         color = strokeColor
         style = Paint.Style.STROKE
-        strokeWidth = 4f
+        strokeWidth = 5f
         isAntiAlias = true
     }
 
     private val fillPaint = Paint().apply {
-        color = if (isRegionSelectionOnly) Color.parseColor("#20F59E0B") else Color.parseColor("#2000F0FF")
+        color = Color.parseColor("#20FFD700")
         style = Paint.Style.FILL
     }
 
     private val gridPaint = Paint().apply {
-        color = Color.parseColor("#40FFFFFF")
+        color = Color.parseColor("#40FFD700")
         strokeWidth = 1.5f
     }
 
     private val handlePaint = Paint().apply {
-        color = Color.WHITE
+        color = Color.parseColor("#FFFFFF")
         style = Paint.Style.FILL
         isAntiAlias = true
     }
@@ -81,19 +80,24 @@ class CropSelectorView(
             setPadding(16, 10, 16, 10)
             val bg = android.graphics.drawable.GradientDrawable().apply {
                 cornerRadius = 30f
-                setColor(Color.parseColor("#E60F172A"))
-                setStroke(2, strokeColor)
+                setColor(Color.parseColor("#E60B0C10"))
+                setStroke(2, Color.parseColor("#D4AF37"))
             }
             background = bg
         }
 
         val btnConfirm = Button(context).apply {
             text = if (isRegionSelectionOnly) "✓ تحديد المنطقة" else "✓ قص الهدف"
-            setTextColor(Color.WHITE)
+            setTextColor(Color.parseColor("#0B0C10"))
             textSize = 12f
-            setBackgroundColor(Color.parseColor("#10B981"))
+            typeface = Typeface.DEFAULT_BOLD
+            setBackgroundColor(Color.parseColor("#FFD700"))
             setOnClickListener {
-                onConfirm(cropRect, null)
+                // إخفاء الإطار فوراً قبل أخذ لقطة الشاشة حتى لا تخرج الصورة سوداء
+                this@CropSelectorView.visibility = View.INVISIBLE
+                postDelayed({
+                    onConfirm(cropRect)
+                }, 100)
             }
         }
 
@@ -101,7 +105,7 @@ class CropSelectorView(
             text = "📋 نسخ"
             setTextColor(Color.WHITE)
             textSize = 12f
-            setBackgroundColor(Color.parseColor("#0284C7"))
+            setBackgroundColor(Color.parseColor("#1F2937"))
             setOnClickListener {
                 val text = "X: ${cropRect.centerX().toInt()}, Y: ${cropRect.centerY().toInt()}, W: ${cropRect.width().toInt()}, H: ${cropRect.height().toInt()}"
                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
