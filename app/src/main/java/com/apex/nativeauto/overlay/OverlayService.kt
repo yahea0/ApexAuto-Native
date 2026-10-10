@@ -10,8 +10,6 @@ import android.content.pm.ServiceInfo
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.PixelFormat
-import android.graphics.PointF
-import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
@@ -76,6 +74,21 @@ class OverlayService : Service() {
                 }
             }
         }
+
+        // تحديث الاسم فورياً في كل الخطوات عند تغييره من المستودع
+        fun notifyTargetRenamed(oldName: String, newName: String) {
+            instance?.let { service ->
+                service.mainHandler.post {
+                    service.stepsList.forEach { step ->
+                        if (step.targetImageName == oldName) {
+                            step.targetImageName = newName
+                            step.name = newName
+                        }
+                    }
+                    service.renderMainJobsView()
+                }
+            }
+        }
     }
 
     private lateinit var windowManager: WindowManager
@@ -90,6 +103,7 @@ class OverlayService : Service() {
 
     private var isRunningLoop = false
     private var isAttached = false
+    private var loopCountLimit = 0 // 0 = تكرار لا نهائي
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -184,6 +198,7 @@ class OverlayService : Service() {
         rootContainer = FrameLayout(this)
         val density = resources.displayMetrics.density
 
+        // الزر العائم الملكي الذهبي (48dp)
         bubbleView = TextView(this).apply {
             text = "⚡"
             textSize = 20f
@@ -198,6 +213,7 @@ class OverlayService : Service() {
             layoutParams = FrameLayout.LayoutParams((48 * density).toInt(), (48 * density).toInt())
         }
 
+        // الجناح الموسع بتصميم أسود ملكي فخم
         suitePanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             visibility = View.GONE
@@ -264,6 +280,7 @@ class OverlayService : Service() {
         suitePanel.removeAllViews()
         val density = resources.displayMetrics.density
 
+        // الشريط العلوي الملكي مع الأدوات المتقدمة في الزاوية اليمنى (الصورة 3)
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -271,18 +288,47 @@ class OverlayService : Service() {
         val title = TextView(this).apply {
             text = "⚡ APEX ROYAL STUDIO"
             setTextColor(Color.parseColor("#FFD700"))
-            textSize = 15f
+            textSize = 14f
             typeface = Typeface.DEFAULT_BOLD
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
+
+        // 1. زر إضافة خطوة برمجية فارغة وجديدة (+)
+        val btnAddEmptyStep = TextView(this).apply {
+            text = " ➕ "
+            textSize = 15f
+            setTextColor(Color.parseColor("#FFD700"))
+            setOnClickListener { addEmptyCustomStep() }
+        }
+
+        // 2. زر فتح المستودع من الشريط العلوي (📁)
+        val btnTopLibrary = TextView(this).apply {
+            text = " 📁 "
+            textSize = 15f
+            setTextColor(Color.parseColor("#FFD700"))
+            setOnClickListener { showInAppTargetPicker() }
+        }
+
+        // 3. زر إعدادات التشغيل العامة (⚙️)
+        val btnGlobalSettings = TextView(this).apply {
+            text = " ⚙️ "
+            textSize = 14f
+            setTextColor(Color.parseColor("#FFD700"))
+            setOnClickListener { showGlobalJobSettingsDialog() }
+        }
+
         val btnClose = TextView(this).apply {
-            text = "✕"
+            text = " ✕"
             setTextColor(Color.parseColor("#D4AF37"))
-            textSize = 18f
-            setPadding((6 * density).toInt(), 0, (4 * density).toInt(), 0)
+            textSize = 17f
+            setPadding((6 * density).toInt(), 0, (2 * density).toInt(), 0)
             setOnClickListener { togglePanelExpansion(false) }
         }
+
         header.addView(title)
+        header.addView(btnAddEmptyStep)
+        header.addView(btnTopLibrary)
+        header.addView(btnGlobalSettings)
         header.addView(btnClose)
         suitePanel.addView(header)
 
@@ -312,7 +358,6 @@ class OverlayService : Service() {
                 ).apply { topMargin = (8 * density).toInt() }
             }
 
-            // الشريط العلوي
             val topBar = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
@@ -320,10 +365,10 @@ class OverlayService : Service() {
             }
 
             val titleText = TextView(this).apply {
-                val anglesCount = step.trainedVariations.size + 1
-                text = "${index + 1}. ${step.name} ($anglesCount زوايا)"
+                val anglesCount = step.trainedVariations.size + (if (step.thumbnail != null) 1 else 0)
+                text = "${index + 1}. ${step.name}" + if (anglesCount > 0) " ($anglesCount زوايا)" else ""
                 setTextColor(Color.parseColor("#FFD700"))
-                textSize = 12f
+                textSize = 13f
                 typeface = Typeface.DEFAULT_BOLD
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                 setOnClickListener { showActionSettingsDialog(index) }
@@ -396,13 +441,13 @@ class OverlayService : Service() {
             topBar.addView(btnDown)
             topBar.addView(btnDel)
 
-            // سطر التحكم بالسرعة والنقر (قابل للنقر لتعديل السرعة فوراً)
+            // سطر التحكم بالنقر والسرعة
             val rowClick = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
                 layoutDirection = View.LAYOUT_DIRECTION_LTR
                 setPadding(0, (8 * density).toInt(), 0, 0)
-                setOnClickListener { showActionSettingsDialog(index) } // ضغطة تفتح تعديل السرعة
+                setOnClickListener { showActionSettingsDialog(index) }
             }
 
             if (step.thumbnail != null) {
@@ -429,7 +474,7 @@ class OverlayService : Service() {
             }
             rowClick.addView(txtClick)
 
-            // سطر الفرع (نطاق البحث والدقة)
+            // سطر الفرع
             val rowBranch = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
@@ -444,7 +489,7 @@ class OverlayService : Service() {
                     DetectScope.CUSTOM_REGION -> "Custom Region"
                     DetectScope.FULL_SCREEN -> "Full Screen"
                 }
-                text = "└ Image [Appear] [${step.similarityPercent}%] [$scopeName] ⚙"
+                text = if (step.thumbnail != null) "└ Image [Appear] [${step.similarityPercent}%] [$scopeName] ⚙" else "└ Code Action (مخصص) ⚙"
                 setTextColor(Color.parseColor("#A0A5B5"))
                 textSize = 10f
             }
@@ -499,7 +544,6 @@ class OverlayService : Service() {
                 marginStart = (4 * density).toInt()
             }
             setOnClickListener {
-                // فتح المعرض بشفافية كاملة دون استدعاء الشاشة الرئيسية
                 val intent = Intent(this@OverlayService, TransparentPickerActivity::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
                 }
@@ -531,6 +575,22 @@ class OverlayService : Service() {
             }
         }
         suitePanel.addView(btnRunJob)
+    }
+
+    // إضافة خطوة برمجية فارغة تماماً دون أي كود مفروض (الطلب 1)
+    private fun addEmptyCustomStep() {
+        val nextNum = stepsList.size + 1
+        val newStep = MacroStep(
+            stepNumber = nextNum,
+            name = "Script Step $nextNum",
+            type = ActionType.JS_SCRIPT,
+            thumbnail = null,
+            customScript = "", // فارغ تماماً لتكتب ما تريد بكيفك
+            delayAfterMs = 300L
+        )
+        stepsList.add(newStep)
+        renderMainJobsView()
+        openJsEditor(stepsList.size - 1)
     }
 
     // نافذة اختيار هدف من المستودع بلمسة واحدة دون مغادرة اللعبة
@@ -619,7 +679,7 @@ class OverlayService : Service() {
         val density = resources.displayMetrics.density
 
         val title = TextView(this).apply {
-            text = "إعدادات الأكشن وسرعة النقر"
+            text = "إعدادات الأكشن والسرعة"
             setTextColor(Color.parseColor("#FFD700"))
             textSize = 14f
             typeface = Typeface.DEFAULT_BOLD
@@ -655,65 +715,68 @@ class OverlayService : Service() {
         }
         suitePanel.addView(editRepeat)
 
-        val txtTraining = TextView(this).apply {
-            text = "🧠 زوايا الذكاء الاصطناعي المدربة (${step.trainedVariations.size} زوايا):"
-            setTextColor(Color.parseColor("#FFD700"))
-            textSize = 11f
-            setPadding(0, (8 * density).toInt(), 0, (4 * density).toInt())
-        }
-        suitePanel.addView(txtTraining)
+        // قسم التدريب المتعدد للذكاء الاصطناعي
+        if (step.thumbnail != null) {
+            val txtTraining = TextView(this).apply {
+                text = "🧠 تدريب الذكاء الاصطناعي (${step.trainedVariations.size} زوايا مدربة):"
+                setTextColor(Color.parseColor("#FFD700"))
+                textSize = 11f
+                setPadding(0, (8 * density).toInt(), 0, (4 * density).toInt())
+            }
+            suitePanel.addView(txtTraining)
 
-        val horizontalScroll = HorizontalScrollView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                (45 * density).toInt()
-            )
-        }
-        val trainingContainer = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            val horizontalScroll = HorizontalScrollView(this).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    (45 * density).toInt()
+                )
+            }
+            val trainingContainer = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
 
-        step.trainedVariations.forEachIndexed { vIndex, vBmp ->
-            val vImg = ImageView(this).apply {
-                setImageBitmap(vBmp)
-                scaleType = ImageView.ScaleType.FIT_CENTER
+            step.trainedVariations.forEachIndexed { vIndex, vBmp ->
+                val vImg = ImageView(this).apply {
+                    setImageBitmap(vBmp)
+                    scaleType = ImageView.ScaleType.FIT_CENTER
+                    val bg = GradientDrawable().apply {
+                        cornerRadius = 4 * density
+                        setStroke(1, Color.parseColor("#FFD700"))
+                    }
+                    background = bg
+                    layoutParams = LinearLayout.LayoutParams((36 * density).toInt(), (36 * density).toInt()).apply {
+                        marginEnd = (6 * density).toInt()
+                    }
+                    setOnLongClickListener {
+                        step.trainedVariations.removeAt(vIndex)
+                        showActionSettingsDialog(index)
+                        true
+                    }
+                }
+                trainingContainer.addView(vImg)
+            }
+            horizontalScroll.addView(trainingContainer)
+            suitePanel.addView(horizontalScroll)
+
+            val btnAddVariation = Button(this).apply {
+                text = "➕ تدريب زاوية جديدة من المعرض"
+                setTextColor(Color.parseColor("#0B0C10"))
+                textSize = 11f
+                typeface = Typeface.DEFAULT_BOLD
                 val bg = GradientDrawable().apply {
-                    cornerRadius = 4 * density
-                    setStroke(1, Color.parseColor("#FFD700"))
+                    cornerRadius = 8 * density
+                    setColor(Color.parseColor("#FFD700"))
                 }
                 background = bg
-                layoutParams = LinearLayout.LayoutParams((36 * density).toInt(), (36 * density).toInt()).apply {
-                    marginEnd = (6 * density).toInt()
-                }
-                setOnLongClickListener {
-                    step.trainedVariations.removeAt(vIndex)
-                    showActionSettingsDialog(index)
-                    true
+                setOnClickListener {
+                    val intent = Intent(this@OverlayService, TransparentPickerActivity::class.java).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
+                        putExtra("IS_TRAINING_MODE", true)
+                        putExtra("TARGET_STEP_INDEX", index)
+                    }
+                    startActivity(intent)
                 }
             }
-            trainingContainer.addView(vImg)
+            suitePanel.addView(btnAddVariation)
         }
-        horizontalScroll.addView(trainingContainer)
-        suitePanel.addView(horizontalScroll)
-
-        val btnAddVariation = Button(this).apply {
-            text = "➕ تدريب زاوية جديدة من المعرض"
-            setTextColor(Color.parseColor("#0B0C10"))
-            textSize = 11f
-            typeface = Typeface.DEFAULT_BOLD
-            val bg = GradientDrawable().apply {
-                cornerRadius = 8 * density
-                setColor(Color.parseColor("#FFD700"))
-            }
-            background = bg
-            setOnClickListener {
-                val intent = Intent(this@OverlayService, TransparentPickerActivity::class.java).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
-                    putExtra("IS_TRAINING_MODE", true)
-                    putExtra("TARGET_STEP_INDEX", index)
-                }
-                startActivity(intent)
-            }
-        }
-        suitePanel.addView(btnAddVariation)
 
         val btnSave = Button(this).apply {
             text = "حفظ"
@@ -736,7 +799,7 @@ class OverlayService : Service() {
             delay(150)
             val screen = ScreenCaptureManager.getRealScreenshot()
             mainHandler.post {
-                if (screen != null) {
+                if (screen != null && step.thumbnail != null) {
                     val match = ImageMatcher.findTarget(step, screen)
                     if (match.isMatched && match.targetCenter != null) {
                         ApexAccessibilityService.instance?.performClick(match.targetCenter.x, match.targetCenter.y)
@@ -744,6 +807,9 @@ class OverlayService : Service() {
                     } else {
                         Toast.makeText(applicationContext, "✕ لم يُعثر على أي من زوايا الهدف (تطابق ${match.currentSimilarity}%)", Toast.LENGTH_SHORT).show()
                     }
+                } else if (step.customScript.isNotBlank()) {
+                    scriptRunner.execute(step.customScript, step.stepNumber, step.targetArea.centerX(), step.targetArea.centerY())
+                    Toast.makeText(applicationContext, "✓ تم تنفيذ الكود المخصص!", Toast.LENGTH_SHORT).show()
                 }
                 mainHandler.postDelayed({
                     rootContainer.visibility = View.VISIBLE
@@ -752,7 +818,6 @@ class OverlayService : Service() {
         }
     }
 
-    // إعدادات الفرع (استعادة الخيارات الثلاثة كاملة)
     private fun showBranchSettingsDialog(index: Int) {
         setKeyboardFocusable(true)
         val step = stepsList[index]
@@ -790,62 +855,44 @@ class OverlayService : Service() {
             setPadding(0, (8 * density).toInt(), 0, (8 * density).toInt())
         }
 
-        lateinit var cardCap: LinearLayout
         lateinit var cardFull: LinearLayout
-        lateinit var cardCustom: LinearLayout
 
-        fun updateCardStyles() {
-            fun style(card: LinearLayout, isSel: Boolean) {
-                val bg = GradientDrawable().apply {
-                    cornerRadius = 10 * density
-                    setColor(if (isSel) Color.parseColor("#262214") else Color.parseColor("#151722"))
-                    setStroke(1, if (isSel) Color.parseColor("#FFD700") else Color.parseColor("#333A4D"))
-                }
-                card.background = bg
-                (card.getChildAt(0) as TextView).text = if (isSel) "● " else "○ "
-                (card.getChildAt(0) as TextView).setTextColor(if (isSel) Color.parseColor("#FFD700") else Color.GRAY)
+        fun style(card: LinearLayout, isSel: Boolean) {
+            val bg = GradientDrawable().apply {
+                cornerRadius = 10 * density
+                setColor(if (isSel) Color.parseColor("#262214") else Color.parseColor("#151722"))
+                setStroke(1, if (isSel) Color.parseColor("#FFD700") else Color.parseColor("#333A4D"))
             }
-            style(cardCap, selectedScope == DetectScope.CAPTURED_LOCATION)
-            style(cardFull, selectedScope == DetectScope.FULL_SCREEN)
-            style(cardCustom, selectedScope == DetectScope.CUSTOM_REGION)
+            card.background = bg
+            (card.getChildAt(0) as TextView).text = if (isSel) "● " else "○ "
+            (card.getChildAt(0) as TextView).setTextColor(if (isSel) Color.parseColor("#FFD700") else Color.GRAY)
         }
 
-        fun makeCard(name: String, scopeType: DetectScope): LinearLayout {
-            val card = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding((12 * density).toInt(), (10 * density).toInt(), (12 * density).toInt(), (10 * density).toInt())
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { topMargin = (5 * density).toInt() }
-                setOnClickListener {
-                    selectedScope = scopeType
-                    updateCardStyles()
-                }
+        cardFull = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding((12 * density).toInt(), (10 * density).toInt(), (12 * density).toInt(), (10 * density).toInt())
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = (5 * density).toInt() }
+            setOnClickListener {
+                selectedScope = DetectScope.FULL_SCREEN
+                style(cardFull, true)
             }
-            val icon = TextView(this).apply { textSize = 12f }
-            val labelTextView = TextView(this).apply {
-                this.text = name
-                setTextColor(Color.WHITE)
-                textSize = 11f
-            }
-            card.addView(icon)
-            card.addView(labelTextView)
-            return card
         }
-
-        // الخيارات الثلاثة كاملة
-        cardCap = makeCard("Captured Location (المكان الأصلي)", DetectScope.CAPTURED_LOCATION)
-        cardFull = makeCard("Full Screen (كامل الشاشة)", DetectScope.FULL_SCREEN)
-        cardCustom = makeCard("Custom Region (منطقة مخصصة)", DetectScope.CUSTOM_REGION)
-
-        cardScopeContainer.addView(cardCap)
+        val icon = TextView(this).apply { textSize = 12f }
+        val labelTextView = TextView(this).apply {
+            this.text = "Full Screen (كامل الشاشة للبحث عن الهدف وزواياه)"
+            setTextColor(Color.WHITE)
+            textSize = 11f
+        }
+        cardFull.addView(icon)
+        cardFull.addView(labelTextView)
         cardScopeContainer.addView(cardFull)
-        cardScopeContainer.addView(cardCustom)
         suitePanel.addView(cardScopeContainer)
 
-        updateCardStyles()
+        style(cardFull, true)
 
         val btnSave = Button(this).apply {
             text = "SAVE"
@@ -864,6 +911,7 @@ class OverlayService : Service() {
         suitePanel.addView(btnSave)
     }
 
+    // 4. محرر الكود مع شريط الأوامر السريعة للمبتدئين في الأعلى (المكان المحدد في الصورة 4)
     private fun openJsEditor(index: Int) {
         setKeyboardFocusable(true)
         suitePanel.removeAllViews()
@@ -873,7 +921,7 @@ class OverlayService : Service() {
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, 0, 0, (8 * density).toInt())
+            setPadding(0, 0, 0, (6 * density).toInt())
         }
         val btnBack = TextView(this).apply {
             text = "← رجوع"
@@ -902,10 +950,80 @@ class OverlayService : Service() {
             typeface = Typeface.MONOSPACE
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                (140 * density).toInt()
+                (130 * density).toInt()
             )
             addTextChangedListener(CodeSyntaxHighlighter())
         }
+
+        fun insertSnippet(snippet: String) {
+            val start = max(0, editCode.selectionStart)
+            val end = max(0, editCode.selectionEnd)
+            editCode.text.replace(min(start, end), max(start, end), snippet)
+        }
+
+        // شريط الأوامر السريعة المنزلق للمبتدئين (الصورة 4)
+        val toolbarScroll = HorizontalScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (36 * density).toInt()
+            ).apply { bottomMargin = (6 * density).toInt() }
+        }
+        val toolbarContainer = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+
+        fun makeSnippetBtn(label: String, code: String): Button {
+            return Button(this).apply {
+                text = label
+                textSize = 10f
+                setTextColor(Color.parseColor("#0B0C10"))
+                val bg = GradientDrawable().apply {
+                    cornerRadius = 6 * density
+                    setColor(Color.parseColor("#FFD700"))
+                }
+                background = bg
+                setPadding(12, 0, 12, 0)
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    (28 * density).toInt()
+                ).apply { marginEnd = (4 * density).toInt() }
+                setOnClickListener { insertSnippet(code) }
+            }
+        }
+
+        toolbarContainer.addView(makeSnippetBtn("👆 clickImage", "clickImage(\"${step.targetImageName}\");\n"))
+        toolbarContainer.addView(makeSnippetBtn("👁️ findImage", "if (findImage(\"${step.targetImageName}\", 70).found) {\n    click(x, y);\n}\n"))
+        toolbarContainer.addView(makeSnippetBtn("⏱️ sleep", "sleep(500);\n"))
+        toolbarContainer.addView(makeSnippetBtn("💬 toast", "toast(\"تم العثور على الهدف!\");\n"))
+        toolbarContainer.addView(makeSnippetBtn("🔙 Back", "pressBack();\n"))
+        toolbarContainer.addView(makeSnippetBtn("🏠 Home", "pressHome();\n"))
+
+        val btnPickTargetName = Button(this).apply {
+            text = "📁 اسم صورة"
+            textSize = 10f
+            setTextColor(Color.WHITE)
+            val bg = GradientDrawable().apply {
+                cornerRadius = 6 * density
+                setColor(Color.parseColor("#1F222E"))
+                setStroke(1, Color.parseColor("#D4AF37"))
+            }
+            background = bg
+            setPadding(12, 0, 12, 0)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                (28 * density).toInt()
+            )
+            setOnClickListener {
+                val targets = ImageLibrary.targetImages.keys.toList()
+                if (targets.isNotEmpty()) {
+                    insertSnippet("\"${targets.first()}\"")
+                } else {
+                    Toast.makeText(this@OverlayService, "المستودع فارغ حالياً", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+        toolbarContainer.addView(btnPickTargetName)
+
+        toolbarScroll.addView(toolbarContainer)
+        suitePanel.addView(toolbarScroll)
         suitePanel.addView(editCode)
 
         val btnSave = Button(this).apply {
@@ -914,6 +1032,52 @@ class OverlayService : Service() {
             setBackgroundColor(Color.parseColor("#FFD700"))
             setOnClickListener {
                 step.customScript = editCode.text.toString()
+                renderMainJobsView()
+            }
+        }
+        suitePanel.addView(btnSave)
+    }
+
+    // نافذة الإعدادات الشاملة للمهمة
+    private fun showGlobalJobSettingsDialog() {
+        suitePanel.removeAllViews()
+        val density = resources.displayMetrics.density
+
+        val title = TextView(this).apply {
+            text = "⚙️ إعدادات المهمة العامة"
+            setTextColor(Color.parseColor("#FFD700"))
+            textSize = 15f
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, (10 * density).toInt())
+        }
+        suitePanel.addView(title)
+
+        val txtLoop = TextView(this).apply {
+            text = "عدد مرات تكرار المهمة (0 = تكرار لا نهائي):"
+            setTextColor(Color.WHITE)
+            textSize = 11f
+        }
+        val editLoop = EditText(this).apply {
+            setText(loopCountLimit.toString())
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            setTextColor(Color.parseColor("#FFD700"))
+            setBackgroundColor(Color.parseColor("#151722"))
+            setPadding(16, 10, 16, 10)
+        }
+        suitePanel.addView(txtLoop)
+        suitePanel.addView(editLoop)
+
+        val btnSave = Button(this).apply {
+            text = "حفظ والعودة"
+            setTextColor(Color.parseColor("#0B0C10"))
+            setBackgroundColor(Color.parseColor("#FFD700"))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = (10 * density).toInt() }
+            setOnClickListener {
+                loopCountLimit = editLoop.text.toString().toIntOrNull() ?: 0
                 renderMainJobsView()
             }
         }
@@ -932,13 +1096,16 @@ class OverlayService : Service() {
     private fun startExecution() {
         isRunningLoop = true
         scope.launch {
+            var currentCycle = 0
             while (isRunningLoop) {
+                if (loopCountLimit > 0 && currentCycle >= loopCountLimit) break
+
                 for (step in stepsList) {
                     if (!isRunningLoop) break
                     if (!step.enabled) continue
 
                     val screen = ScreenCaptureManager.getRealScreenshot()
-                    if (screen != null) {
+                    if (screen != null && step.thumbnail != null) {
                         val match = ImageMatcher.findTarget(step, screen)
                         if (match.isMatched && match.targetCenter != null) {
                             for (r in 0 until step.repeatCount) {
@@ -953,7 +1120,10 @@ class OverlayService : Service() {
                     }
                     Thread.sleep(step.delayAfterMs)
                 }
+                currentCycle++
             }
+            isRunningLoop = false
+            mainHandler.post { renderMainJobsView() }
         }
     }
 
