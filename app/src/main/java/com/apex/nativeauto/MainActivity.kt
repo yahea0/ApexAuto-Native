@@ -61,7 +61,6 @@ class MainActivity : AppCompatActivity() {
 
         val btnAccessibility = findViewById<Button?>(R.id.btn_enable_accessibility)
         val btnStartOverlay = findViewById<Button?>(R.id.btn_start_overlay)
-        val btnOpenLibrary = findViewById<Button?>(R.id.btn_open_library)
 
         btnAccessibility?.setOnClickListener {
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
@@ -78,8 +77,12 @@ class MainActivity : AppCompatActivity() {
             captureLauncher.launch(mpManager.createScreenCaptureIntent())
         }
 
-        btnOpenLibrary?.setOnClickListener {
-            mainLibraryLauncher.launch("image/*")
+        // استدعاء آمن لمعرف زر المستودع لمنع أي خطأ تجميع
+        val libraryResId = resources.getIdentifier("btn_open_library", "id", packageName)
+        if (libraryResId != 0) {
+            findViewById<Button?>(libraryResId)?.setOnClickListener {
+                mainLibraryLauncher.launch("image/*")
+            }
         }
     }
 
