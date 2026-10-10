@@ -25,14 +25,14 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="AI Multi-Angle Autonomous Studio"
+            android:text="Dual-Engine: Visual Studio &amp; Pro JS IDE"
             android:textColor="#94A3B8"
             android:textSize="13sp" />
 
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
-            android:layout_marginVertical="20dp"
+            android:layout_marginVertical="18dp"
             android:background="#1E293B" />
 
         <!-- 1. محرك النقر المباشر -->
@@ -54,19 +54,19 @@
             <Button
                 android:id="@+id/btn_enable_accessibility"
                 android:layout_width="match_parent"
-                android:layout_height="50dp"
-                android:layout_marginTop="12dp"
+                android:layout_height="48dp"
+                android:layout_marginTop="10dp"
                 android:backgroundTint="#FFD700"
                 android:text="⚡ تفعيل خدمة النقر (ACCESSIBILITY)"
                 android:textColor="#0B0C10"
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- 2. استوديو الأتمتة العائم -->
+        <!-- 2. استوديو الأتمتة البصري العادي -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="14dp"
             android:background="#12141D"
             android:orientation="vertical"
             android:padding="16dp">
@@ -74,27 +74,27 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="2. استوديو الأتمتة العائم (Floating Studio)"
+                android:text="2. استوديو الأتمتة البصري (Visual Studio)"
                 android:textColor="#FFFFFF"
                 android:textSize="14sp"
                 android:textStyle="bold" />
 
             <Button
-                android:id="@+id/btn_start_overlay"
+                android:id="@+id/btn_start_visual_overlay"
                 android:layout_width="match_parent"
-                android:layout_height="50dp"
-                android:layout_marginTop="12dp"
+                android:layout_height="48dp"
+                android:layout_marginTop="10dp"
                 android:backgroundTint="#10B981"
-                android:text="🔘 تشغيل الاستوديو العائم للأتمتة"
+                android:text="🔘 تشغيل الأتمتة العادية (البصرية)"
                 android:textColor="#FFFFFF"
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- 3. قسم مكتبة ومستودع الصور وتدريب الذكاء الاصطناعي (NEW) -->
+        <!-- 3. استوديو أتمتة المحترفين المتقدم (Pro Script IDE) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="14dp"
             android:background="#12141D"
             android:orientation="vertical"
             android:padding="16dp">
@@ -102,7 +102,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="3. مستودع الصور وإدارة الأهداف (Targets Library)"
+                android:text="3. أتمتة المحترفين البرمجية (Pro Script IDE)"
                 android:textColor="#FFD700"
                 android:textSize="14sp"
                 android:textStyle="bold" />
@@ -110,16 +110,35 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="استعراض الأهداف المحفوظة، إعادة تسميتها، وحذفها أو إضافة صور جديدة"
+                android:layout_marginTop="2dp"
+                android:text="محرر جافا سكريبت متقدم عائم فوق اللعبة مع الإكمال التلقائي وسجل حي"
                 android:textColor="#64748B"
                 android:textSize="11sp" />
 
             <Button
+                android:id="@+id/btn_start_pro_overlay"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="10dp"
+                android:backgroundTint="#7C3AED"
+                android:text="💻 تشغيل محرر المحترفين (Pro IDE)"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- 4. مستودع الصور -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:background="#12141D"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <Button
                 android:id="@+id/btn_open_library"
                 android:layout_width="match_parent"
-                android:layout_height="50dp"
-                android:layout_marginTop="12dp"
+                android:layout_height="48dp"
                 android:backgroundTint="#1F222E"
                 android:text="📁 إدارة مستودع الصور والأهداف"
                 android:textColor="#FFD700"
