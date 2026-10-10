@@ -1,13 +1,14 @@
 package com.apex.nativeauto.picker
 
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
+import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AppCompatActivity
 import com.apex.nativeauto.overlay.OverlayService
 
-class TransparentPickerActivity : AppCompatActivity() {
+class TransparentPickerActivity : ComponentActivity() {
 
     private val galleryLauncher = registerForActivityResult(
         ActivityResultContracts.GetContent()
@@ -15,7 +16,7 @@ class TransparentPickerActivity : AppCompatActivity() {
         if (uri != null) {
             try {
                 contentResolver.openInputStream(uri)?.use { stream ->
-                    val bitmap = BitmapFactory.decodeStream(stream)
+                    val bitmap: Bitmap? = BitmapFactory.decodeStream(stream)
                     if (bitmap != null) {
                         val isTrainingMode = intent.getBooleanExtra("IS_TRAINING_MODE", false)
                         val targetStepIndex = intent.getIntExtra("TARGET_STEP_INDEX", -1)
@@ -31,7 +32,7 @@ class TransparentPickerActivity : AppCompatActivity() {
                 e.printStackTrace()
             }
         }
-        finish() // إغلاق فوري للعودة للعبة
+        finish()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
