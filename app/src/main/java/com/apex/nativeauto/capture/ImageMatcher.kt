@@ -13,9 +13,9 @@ object ImageMatcher {
     init {
         try {
             System.loadLibrary("apex_vision")
-            Log.i("Apex_ImageMatcher", "تم تحميل مكتبة C++ (YOLOv12 & OpenCV) بنجاح!")
+            Log.i("Apex_ImageMatcher", "تم تحميل مكتبة C++ بنجاح!")
         } catch (e: UnsatisfiedLinkError) {
-            Log.e("Apex_ImageMatcher", "فشل تحميل المكتبة الأصلية: ${e.message}")
+            Log.e("Apex_ImageMatcher", "فشل تحميل C++: ${e.message}")
         }
     }
 
@@ -35,8 +35,14 @@ object ImageMatcher {
         }
     }
 
+    // فحص كل الزوايا والأشكال المدربة للهدف
     fun findTarget(step: MacroStep, screenBitmap: Bitmap): MatchResult {
-        val template = step.thumbnail ?: return MatchResult(false, null, 0)
+        // جمع كل الصور المدربة للهدف
+        val allTemplates = mutableListOf<Bitmap>()
+        step.thumbnail?.let { allTemplates.add(it) }
+        allTemplates.addAll(step.trainedVariations)
+
+        if (allTemplates.isEmpty()) return MatchResult(false, null, 0)
 
         val scopeInt = when (step.detectScope) {
             DetectScope.CAPTURED_LOCATION -> 0
@@ -49,27 +55,39 @@ object ImageMatcher {
             else -> step.targetArea
         }
 
-        return try {
-            val res = nativeMatchWithOpenCV(
-                screenBitmap,
-                template,
-                scopeInt,
-                step.similarityPercent,
-                roi.left.toInt(),
-                roi.top.toInt(),
-                roi.width().toInt(),
-                roi.height().toInt()
-            )
+        var bestMatch = MatchResult(false, null, 0)
 
-            val isFound = res[0] > 0.5f
-            val targetCenter = PointF(res[1], res[2])
-            val confidence = res[3].toInt()
+        // تمشيط الشاشة بحثاً عن أي زاوية من الزوايا المدربة
+        for (template in allTemplates) {
+            try {
+                val res = nativeMatchWithOpenCV(
+                    screenBitmap,
+                    template,
+                    scopeInt,
+                    step.similarityPercent,
+                    roi.left.toInt(),
+                    roi.top.toInt(),
+                    roi.width().toInt(),
+                    roi.height().toInt()
+                )
 
-            MatchResult(isFound, targetCenter, confidence)
-        } catch (e: Exception) {
-            Log.e("Apex_ImageMatcher", "خطأ أثناء مطابقة C++: ${e.message}")
-            MatchResult(false, null, 0)
+                val isFound = res[0] > 0.5f
+                val targetCenter = PointF(res[1], res[2])
+                val confidence = res[3].toInt()
+
+                if (isFound) {
+                    return MatchResult(true, targetCenter, confidence)
+                }
+
+                if (confidence > bestMatch.currentSimilarity) {
+                    bestMatch = MatchResult(false, targetCenter, confidence)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
+
+        return bestMatch
     }
 
     data class MatchResult(val isMatched: Boolean, val targetCenter: PointF?, val currentSimilarity: Int)
