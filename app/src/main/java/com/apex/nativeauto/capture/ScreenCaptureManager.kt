@@ -45,13 +45,11 @@ object ScreenCaptureManager {
         )
     }
 
-    // التقاط إطار الشاشة النظيف وتجاوز مشكلة الإطارات الفارغة أو السوداء
     fun captureCurrentScreen(): Bitmap? {
         val reader = imageReader ?: return null
         var image: Image? = null
 
-        // محاولة جلب أحدث إطار متاح مع انتظار قصير للمزامنة
-        for (i in 0 until 5) {
+        for (i in 0 until 6) {
             image = reader.acquireLatestImage()
             if (image != null) break
             Thread.sleep(25)
@@ -62,7 +60,7 @@ object ScreenCaptureManager {
         try {
             val plane = image.planes[0]
             val buffer = plane.buffer
-            buffer.rewind() // ضروري جداً لضمان قراءة البكسلات من البداية
+            buffer.rewind()
 
             val pixelStride = plane.pixelStride
             val rowStride = plane.rowStride
@@ -87,7 +85,7 @@ object ScreenCaptureManager {
         }
     }
 
-    // قص الهدف بدقة متناهية دون زيادة بكسل واحد
+    // اقتصاص ما داخل الإطار فقط بالملي دون أي انزياح
     fun cropAreaFromScreen(cropRect: RectF): Bitmap {
         val fullScreenshot = captureCurrentScreen()
 
