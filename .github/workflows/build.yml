@@ -1,4 +1,4 @@
-name: Build ApexAuto Native (YOLOv12-N)
+name: Build ApexAuto Full Native C++ (OpenCV & AI)
 
 on:
   push:
@@ -25,25 +25,15 @@ jobs:
         ndk-version: r26b
         link-to-sdk: true
 
-    - name: Download & Setup Native Dependencies
+    - name: Download & Setup OpenCV Android SDK
       run: |
-        mkdir -p app/src/main/cpp/third_party/onnxruntime/lib/arm64-v8a
-        mkdir -p app/src/main/cpp/third_party/onnxruntime/include
         mkdir -p app/src/main/cpp/third_party/opencv/lib/arm64-v8a
         mkdir -p app/src/main/cpp/third_party/opencv/include
-
-        ORT_VERSION="1.17.3"
-        curl -L -o ort.aar https://repo1.maven.org/maven2/com/microsoft/onnxruntime/onnxruntime-android/${ORT_VERSION}/onnxruntime-android-${ORT_VERSION}.aar
-        unzip -q ort.aar -d ort_aar
-        cp ort_aar/jni/arm64-v8a/libonnxruntime.so app/src/main/cpp/third_party/onnxruntime/lib/arm64-v8a/
-        cp -r ort_aar/headers/* app/src/main/cpp/third_party/onnxruntime/include/
 
         OPENCV_VERSION="4.9.0"
         curl -L -o opencv.zip https://github.com/opencv/opencv/releases/download/${OPENCV_VERSION}/opencv-${OPENCV_VERSION}-android-sdk.zip
         unzip -q opencv.zip
-        cp OpenCV-android-sdk/sdk/native/libs/arm64-v8a/libopencv_java4.so app/src/main/cpp/third_party/opencv/lib/arm64-v8a/libopencv_core.so
-        cp OpenCV-android-sdk/sdk/native/libs/arm64-v8a/libopencv_java4.so app/src/main/cpp/third_party/opencv/lib/arm64-v8a/libopencv_imgproc.so
-        cp OpenCV-android-sdk/sdk/native/libs/arm64-v8a/libopencv_java4.so app/src/main/cpp/third_party/opencv/lib/arm64-v8a/libopencv_features2d.so
+        cp OpenCV-android-sdk/sdk/native/libs/arm64-v8a/libopencv_java4.so app/src/main/cpp/third_party/opencv/lib/arm64-v8a/
         cp -r OpenCV-android-sdk/sdk/native/jni/include/* app/src/main/cpp/third_party/opencv/include/
 
     - name: Setup Gradle
@@ -51,12 +41,12 @@ jobs:
       with:
         gradle-version: "8.6"
 
-    - name: Build Debug APK
+    - name: Build Full Native APK
       run: |
         gradle assembleDebug --stacktrace
 
     - name: Upload Finished APK
       uses: actions/upload-artifact@v4
       with:
-        name: ApexAuto-YOLOv12-Debug
+        name: ApexAuto-Native-OpenCV-Debug
         path: app/build/outputs/apk/debug/app-debug.apk
