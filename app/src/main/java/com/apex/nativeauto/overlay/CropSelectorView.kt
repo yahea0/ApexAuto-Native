@@ -24,7 +24,7 @@ class CropSelectorView(
     private var activeHandle = -1
     private var lastTouchX = 0f
     private var lastTouchY = 0f
-    private val handleRadius = 26f
+    private val handleRadius = 28f
 
     private val strokeColor = if (isRegionSelectionOnly) Color.parseColor("#F59E0B") else Color.parseColor("#FFD700")
 
@@ -36,12 +36,12 @@ class CropSelectorView(
     }
 
     private val fillPaint = Paint().apply {
-        color = Color.parseColor("#20FFD700")
+        color = Color.parseColor("#25FFD700")
         style = Paint.Style.FILL
     }
 
     private val gridPaint = Paint().apply {
-        color = Color.parseColor("#40FFD700")
+        color = Color.parseColor("#50FFD700")
         strokeWidth = 1.5f
     }
 
@@ -57,12 +57,20 @@ class CropSelectorView(
             canvas.drawRect(cropRect, fillPaint)
             canvas.drawRect(cropRect, strokePaint)
 
+            // شبكة التوجيه الدقيقة
             val thirdW = cropRect.width() / 3
             val thirdH = cropRect.height() / 3
             canvas.drawLine(cropRect.left + thirdW, cropRect.top, cropRect.left + thirdW, cropRect.bottom, gridPaint)
             canvas.drawLine(cropRect.left + thirdW * 2, cropRect.top, cropRect.left + thirdW * 2, cropRect.bottom, gridPaint)
             canvas.drawLine(cropRect.left, cropRect.top + thirdH, cropRect.right, cropRect.top + thirdH, gridPaint)
             canvas.drawLine(cropRect.left, cropRect.top + thirdH * 2, cropRect.right, cropRect.top + thirdH * 2, gridPaint)
+
+            // نقطة المنتصف الدقيقة للهدف
+            val centerPaint = Paint().apply {
+                color = Color.RED
+                style = Paint.Style.FILL
+            }
+            canvas.drawCircle(cropRect.centerX(), cropRect.centerY(), 8f, centerPaint)
 
             canvas.drawCircle(cropRect.right, cropRect.bottom, handleRadius, handlePaint)
             canvas.drawCircle(cropRect.left, cropRect.top, handleRadius / 1.5f, handlePaint)
@@ -80,7 +88,7 @@ class CropSelectorView(
             setPadding(16, 10, 16, 10)
             val bg = android.graphics.drawable.GradientDrawable().apply {
                 cornerRadius = 30f
-                setColor(Color.parseColor("#E60B0C10"))
+                setColor(Color.parseColor("#EE0B0C10"))
                 setStroke(2, Color.parseColor("#D4AF37"))
             }
             background = bg
@@ -93,11 +101,21 @@ class CropSelectorView(
             typeface = Typeface.DEFAULT_BOLD
             setBackgroundColor(Color.parseColor("#FFD700"))
             setOnClickListener {
-                // إخفاء الإطار فوراً قبل أخذ لقطة الشاشة حتى لا تخرج الصورة سوداء
+                // احتساب موضع الإطار الحقيقي على الشاشة بدقة 100%
+                val location = IntArray(2)
+                getLocationOnScreen(location)
+
+                val absoluteRect = RectF(
+                    cropRect.left + location[0],
+                    cropRect.top + location[1],
+                    cropRect.right + location[0],
+                    cropRect.bottom + location[1]
+                )
+
                 this@CropSelectorView.visibility = View.INVISIBLE
                 postDelayed({
-                    onConfirm(cropRect)
-                }, 100)
+                    onConfirm(absoluteRect)
+                }, 120)
             }
         }
 
