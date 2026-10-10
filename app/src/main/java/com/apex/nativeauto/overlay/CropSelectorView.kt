@@ -10,12 +10,14 @@ import android.view.View
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
 import kotlin.math.max
 
 class CropSelectorView(
     context: Context,
-    private val onConfirm: (RectF, Bitmap) -> Unit,
+    private val isRegionSelectionOnly: Boolean = false,
+    private val onConfirm: (RectF, Bitmap?) -> Unit,
     private val onCancel: () -> Unit
 ) : FrameLayout(context) {
 
@@ -25,20 +27,22 @@ class CropSelectorView(
     private var lastTouchY = 0f
     private val handleRadius = 26f
 
+    private val strokeColor = if (isRegionSelectionOnly) Color.parseColor("#F59E0B") else Color.parseColor("#00F0FF")
+
     private val strokePaint = Paint().apply {
-        color = Color.parseColor("#00F0FF")
+        color = strokeColor
         style = Paint.Style.STROKE
         strokeWidth = 4f
         isAntiAlias = true
     }
 
     private val fillPaint = Paint().apply {
-        color = Color.parseColor("#2500F0FF")
+        color = if (isRegionSelectionOnly) Color.parseColor("#20F59E0B") else Color.parseColor("#2000F0FF")
         style = Paint.Style.FILL
     }
 
     private val gridPaint = Paint().apply {
-        color = Color.parseColor("#4400F0FF")
+        color = Color.parseColor("#40FFFFFF")
         strokeWidth = 1.5f
     }
 
@@ -54,7 +58,6 @@ class CropSelectorView(
             canvas.drawRect(cropRect, fillPaint)
             canvas.drawRect(cropRect, strokePaint)
 
-            // رسم خطوط التوجيه الشبكية داخل الإطار
             val thirdW = cropRect.width() / 3
             val thirdH = cropRect.height() / 3
             canvas.drawLine(cropRect.left + thirdW, cropRect.top, cropRect.left + thirdW, cropRect.bottom, gridPaint)
@@ -62,7 +65,6 @@ class CropSelectorView(
             canvas.drawLine(cropRect.left, cropRect.top + thirdH, cropRect.right, cropRect.top + thirdH, gridPaint)
             canvas.drawLine(cropRect.left, cropRect.top + thirdH * 2, cropRect.right, cropRect.top + thirdH * 2, gridPaint)
 
-            // مقابض التحريك والتصغير
             canvas.drawCircle(cropRect.right, cropRect.bottom, handleRadius, handlePaint)
             canvas.drawCircle(cropRect.left, cropRect.top, handleRadius / 1.5f, handlePaint)
         }
@@ -80,19 +82,18 @@ class CropSelectorView(
             val bg = android.graphics.drawable.GradientDrawable().apply {
                 cornerRadius = 30f
                 setColor(Color.parseColor("#E60F172A"))
-                setStroke(2, Color.parseColor("#00F0FF"))
+                setStroke(2, strokeColor)
             }
             background = bg
         }
 
         val btnConfirm = Button(context).apply {
-            text = "✓ تأكيد"
+            text = if (isRegionSelectionOnly) "✓ تحديد المنطقة" else "✓ قص الهدف"
             setTextColor(Color.WHITE)
             textSize = 12f
             setBackgroundColor(Color.parseColor("#10B981"))
             setOnClickListener {
-                val preview = createThumbnailFromCrop(cropRect)
-                onConfirm(cropRect, preview)
+                onConfirm(cropRect, null)
             }
         }
 
@@ -128,21 +129,6 @@ class CropSelectorView(
         addView(toolbar, tParams)
     }
 
-    private fun createThumbnailFromCrop(rect: RectF): Bitmap {
-        val w = max(1, rect.width().toInt())
-        val h = max(1, rect.height().toInt())
-        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bmp)
-        canvas.drawColor(Color.parseColor("#151E32"))
-        val p = Paint().apply {
-            color = Color.parseColor("#00F0FF")
-            style = Paint.Style.STROKE
-            strokeWidth = 3f
-        }
-        canvas.drawRect(0f, 0f, w.toFloat(), h.toFloat(), p)
-        return bmp
-    }
-
     override fun onTouchEvent(event: MotionEvent): Boolean {
         val x = event.x
         val y = event.y
@@ -153,9 +139,9 @@ class CropSelectorView(
                 lastTouchY = y
                 val dist = Math.hypot((x - cropRect.right).toDouble(), (y - cropRect.bottom).toDouble())
                 if (dist < handleRadius * 2) {
-                    activeHandle = 2 // Resize Handle
+                    activeHandle = 2
                 } else if (cropRect.contains(x, y)) {
-                    activeHandle = 1 // Body Move
+                    activeHandle = 1
                 } else {
                     activeHandle = 0
                 }
