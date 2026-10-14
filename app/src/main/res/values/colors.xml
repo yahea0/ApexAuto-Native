@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ألوان الخلفية وعمق الزجاج -->
+    <color name="glass_bg_deep">#080C15</color>
+    <color name="glass_card_surface">#12182633</color> <!-- أبيض شفاف 12% لظهور الزجاج -->
+    <color name="glass_modal_surface">#EE0E1424</color>
+    <color name="glass_border_subtle">#26FFFFFF</color> <!-- حدود زجاجية دقيقة 15% -->
+
+    <!-- ألوان النيون والأزرار الحية -->
+    <color name="neon_gold">#FFD700</color>
+    <color name="neon_gold_dark">#B8860B</color>
+    <color name="neon_gold_glass">#2AFFE082</color>
+    <color name="neon_gold_border">#66FFD700</color>
+
+    <color name="neon_emerald">#00E676</color>
+    <color name="neon_emerald_glass">#2600E676</color>
+    <color name="neon_emerald_dark">#042614</color>
+
+    <!-- النصوص -->
+    <color name="text_primary">#F8FAFC</color>
+    <color name="text_secondary">#94A3B8</color>
+    <color name="text_code_highlight">#38BDF8</color>
+</resources>
