@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="26dp" />
+    <solid android:color="#F20D1322" />
+    <stroke
+        android:width="1.2dp"
+        android:color="#4DFFD700" /> <!-- إطار ذهبي زجاجي خافت بدلاً من الأصفر الفاقع -->
+</shape>
