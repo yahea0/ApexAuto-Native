@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_glass_modal"
+    android:orientation="vertical"
+    android:padding="18dp">
+
+    <!-- شريط العنوان والرجوع -->
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="14dp">
+
+        <TextView
+            android:id="@+id/btn_back"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentRight="true"
+            android:text="رجوع ←"
+            android:textColor="@color/neon_gold"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentLeft="true"
+            android:text="محرر JS: Script Step 1"
+            android:textColor="@color/text_primary"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+    </RelativeLayout>
+
+    <!-- شريط الكبسولات الزجاجية السريعة -->
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="12dp"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/bg_chip_glass"
+                android:paddingHorizontal="14dp"
+                android:paddingVertical="6dp"
+                android:text="👆 clickImage"
+                android:textColor="@color/neon_gold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/bg_chip_glass"
+                android:paddingHorizontal="14dp"
+                android:paddingVertical="6dp"
+                android:text="👁 findImage"
+                android:textColor="@color/neon_gold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/bg_chip_glass"
+                android:paddingHorizontal="14dp"
+                android:paddingVertical="6dp"
+                android:text="⏱ sleep"
+                android:textColor="@color/neon_gold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_chip_glass"
+                android:paddingHorizontal="14dp"
+                android:paddingVertical="6dp"
+                android:text="toast"
+                android:textColor="@color/neon_gold" />
+        </LinearLayout>
+    </HorizontalScrollView>
+
+    <!-- مساحة الكود الزجاجية -->
+    <EditText
+        android:id="@+id/et_code"
+        android:layout_width="match_parent"
+        android:layout_height="180dp"
+        android:background="@drawable/bg_editor_glass"
+        android:gravity="top|left"
+        android:hint="// اكتب كود JS هنا..."
+        android:padding="12dp"
+        android:textColor="@color/text_code_highlight"
+        android:textColorHint="#40FFFFFF"
+        android:textSize="13sp" />
+
+    <!-- زر حفظ الكود -->
+    <Button
+        android:id="@+id/btn_save_code"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:layout_marginTop="14dp"
+        android:background="@drawable/bg_btn_gold_glass"
+        android:stateListAnimator="@null"
+        android:text="حفظ الكود 💾"
+        android:textColor="#0B0F19"
+        android:textSize="15sp"
+        android:textStyle="bold" />
+</LinearLayout>
