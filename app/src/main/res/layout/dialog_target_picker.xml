@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_glass_modal"
+    android:orientation="vertical"
+    android:padding="20dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:gravity="center"
+        android:text="اختر هدفاً من المستودع"
+        android:textColor="@color/neon_gold"
+        android:textSize="18sp"
+        android:textStyle="bold" />
+
+    <!-- قائمة الأهداف بتصميم كبسولات زجاجية -->
+    <ListView
+        android:id="@+id/targets_list"
+        android:layout_width="match_parent"
+        android:layout_height="220dp"
+        android:divider="@android:color/transparent"
+        android:dividerHeight="8dp" />
+
+    <!-- زر إلغاء -->
+    <Button
+        android:id="@+id/btn_cancel"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginTop="12dp"
+        android:background="@drawable/bg_glass_card"
+        android:stateListAnimator="@null"
+        android:text="إلغاء"
+        android:textColor="@color/text_secondary"
+        android:textSize="14sp" />
+</LinearLayout>
