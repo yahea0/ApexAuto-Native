@@ -124,6 +124,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // نافذة مستودع السكربتات المحفوظة مع زر الإضافة الزجاجي
     private fun openScriptsRepositoryDialog() {
         val dialog = Dialog(this)
         dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
@@ -137,18 +138,66 @@ class MainActivity : AppCompatActivity() {
                 setColor(Color.parseColor("#F20F1626"))
                 setStroke((1.2f * density).toInt(), Color.parseColor("#4DFFD700"))
             }
-            layoutParams = ViewGroup.LayoutParams((340 * density).toInt(), (460 * density).toInt())
+            layoutParams = ViewGroup.LayoutParams((340 * density).toInt(), (480 * density).toInt())
+        }
+
+        // الشريط العلوي مع العنوان وزر الزائد الزجاجي المتوهج (Glass Plus Icon)
+        val headerRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, 0, 0, (10 * density).toInt())
         }
 
         val title = TextView(this).apply {
             text = "📜 مستودع السكربتات (Scripts Repository)"
             setTextColor(Color.parseColor("#FFD700"))
-            textSize = 15f
+            textSize = 13.5f
             typeface = android.graphics.Typeface.DEFAULT_BOLD
-            gravity = Gravity.CENTER
-            setPadding(0, 0, 0, (12 * density).toInt())
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
-        root.addView(title)
+
+        val btnGlassPlus = TextView(this).apply {
+            text = "➕"
+            textSize = 14f
+            gravity = Gravity.CENTER
+            setTextColor(Color.parseColor("#FFD700"))
+            background = GradientDrawable().apply {
+                cornerRadius = 16 * density
+                setColor(Color.parseColor("#26FFD700"))
+                setStroke((1.2f * density).toInt(), Color.parseColor("#80FFD700"))
+            }
+            val s = (32 * density).toInt()
+            layoutParams = LinearLayout.LayoutParams(s, s)
+            setOnClickListener {
+                showCreateNewScriptDialog(dialog)
+            }
+        }
+
+        headerRow.addView(title)
+        headerRow.addView(btnGlassPlus)
+        root.addView(headerRow)
+
+        // زر زجاجي عريض لإضافة سكربت نظيف مباشرة
+        val btnAddCleanScript = Button(this).apply {
+            text = "➕ إضافة سكربت جديد نظيف"
+            setTextColor(Color.parseColor("#FFD700"))
+            textSize = 12.5f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            stateListAnimator = null
+            background = GradientDrawable().apply {
+                cornerRadius = 14 * density
+                setColor(Color.parseColor("#1AFFE082"))
+                setStroke((1.2f * density).toInt(), Color.parseColor("#4DFFD700"))
+            }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (42 * density).toInt()
+            ).apply { bottomMargin = (10 * density).toInt() }
+            setOnClickListener {
+                showCreateNewScriptDialog(dialog)
+            }
+        }
+        root.addView(btnAddCleanScript)
 
         val scripts = ScriptStorage.getAllScripts()
 
@@ -164,11 +213,11 @@ class MainActivity : AppCompatActivity() {
 
         if (scripts.isEmpty()) {
             val emptyTxt = TextView(this).apply {
-                text = "لا توجد سكربتات محفوظة بعد.\nيمكنك حفظ السكربت الحالي من الاستوديو العائم عبر زر 💾"
+                text = "لا توجد سكربتات محفوظة بعد.\nاضغط على زر ➕ أعلاه لإنشاء سكربت نظيف جديد."
                 setTextColor(Color.parseColor("#94A3B8"))
                 textSize = 12f
                 gravity = Gravity.CENTER
-                setPadding(0, (40 * density).toInt(), 0, 0)
+                setPadding(0, (30 * density).toInt(), 0, 0)
             }
             container.addView(emptyTxt)
         } else {
@@ -294,6 +343,104 @@ class MainActivity : AppCompatActivity() {
 
         dialog.setContentView(root)
         dialog.show()
+    }
+
+    // نافذة تسمية وإنشاء السكربت النظيف الجديد
+    private fun showCreateNewScriptDialog(parentDialog: Dialog) {
+        val d = Dialog(this)
+        d.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+        val density = resources.displayMetrics.density
+
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding((18 * density).toInt(), (18 * density).toInt(), (18 * density).toInt(), (18 * density).toInt())
+            background = GradientDrawable().apply {
+                cornerRadius = 20 * density
+                setColor(Color.parseColor("#F50D1322"))
+                setStroke((1.5f * density).toInt(), Color.parseColor("#4DFFD700"))
+            }
+        }
+
+        val t = TextView(this).apply {
+            text = "✨ إنشاء سكربت جديد نظيف"
+            setTextColor(Color.parseColor("#FFD700"))
+            textSize = 15f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, (12 * density).toInt())
+        }
+        layout.addView(t)
+
+        val scriptsCount = ScriptStorage.getAllScripts().size + 1
+        val input = EditText(this).apply {
+            hint = "اسم السكربت"
+            setText("Script_$scriptsCount")
+            setTextColor(Color.parseColor("#38BDF8"))
+            textSize = 14f
+            background = GradientDrawable().apply {
+                cornerRadius = 12 * density
+                setColor(Color.parseColor("#1FFFFFFF"))
+                setStroke(1, Color.parseColor("#33FFFFFF"))
+            }
+            setPadding((14 * density).toInt(), (10 * density).toInt(), (14 * density).toInt(), (10 * density).toInt())
+        }
+        layout.addView(input)
+
+        val buttonsRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (42 * density).toInt()
+            ).apply { topMargin = (14 * density).toInt() }
+        }
+
+        val btnCancel = Button(this).apply {
+            text = "إلغاء"
+            setTextColor(Color.parseColor("#94A3B8"))
+            textSize = 12f
+            stateListAnimator = null
+            background = GradientDrawable().apply {
+                cornerRadius = 12 * density
+                setColor(Color.parseColor("#14FFFFFF"))
+                setStroke(1, Color.parseColor("#1FFFFFFF"))
+            }
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f).apply {
+                marginEnd = (4 * density).toInt()
+            }
+            setOnClickListener { d.dismiss() }
+        }
+
+        val btnConfirm = Button(this).apply {
+            text = "إنشاء وبدء ⚡"
+            setTextColor(Color.parseColor("#0B0C10"))
+            textSize = 12f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            stateListAnimator = null
+            background = GradientDrawable().apply {
+                cornerRadius = 12 * density
+                setColor(Color.parseColor("#FFD700"))
+            }
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f).apply {
+                marginStart = (4 * density).toInt()
+            }
+            setOnClickListener {
+                val newName = input.text.toString().trim()
+                if (newName.isNotBlank()) {
+                    ScriptStorage.saveScript(newName, emptyList(), 0)
+                    Toast.makeText(this@MainActivity, "✓ تم إنشاء السكربت ($newName) بنجاح!", Toast.LENGTH_SHORT).show()
+                    d.dismiss()
+                    parentDialog.dismiss()
+                    startOverlayWithAction(newName, OverlayService.ACTION_EDIT_SCRIPT)
+                }
+            }
+        }
+
+        buttonsRow.addView(btnCancel)
+        buttonsRow.addView(btnConfirm)
+        layout.addView(buttonsRow)
+
+        d.setContentView(layout)
+        d.show()
     }
 
     private fun openLibraryManagerDialog() {
