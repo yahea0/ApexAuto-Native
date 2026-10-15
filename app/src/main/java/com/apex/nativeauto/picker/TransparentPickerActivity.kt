@@ -10,6 +10,8 @@ import com.apex.nativeauto.overlay.OverlayService
 
 class TransparentPickerActivity : ComponentActivity() {
 
+    private var imageHandled = false
+
     private val galleryLauncher = registerForActivityResult(
         ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -18,6 +20,7 @@ class TransparentPickerActivity : ComponentActivity() {
                 contentResolver.openInputStream(uri)?.use { stream ->
                     val bitmap: Bitmap? = BitmapFactory.decodeStream(stream)
                     if (bitmap != null) {
+                        imageHandled = true
                         val isTrainingMode = intent?.getBooleanExtra("IS_TRAINING_MODE", false) ?: false
                         val targetStepIndex = intent?.getIntExtra("TARGET_STEP_INDEX", -1) ?: -1
 
@@ -37,6 +40,16 @@ class TransparentPickerActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // إخفاء نافذة التطبيق العائمة تلقائياً لفتح معرض النظام بسلاسة
+        OverlayService.instance?.hideOverlayForPicker()
         galleryLauncher.launch("image/*")
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // في حال خرج المستخدم من المعرض دون اختيار صورة، تعود النافذة العائمة فوراً
+        if (!imageHandled) {
+            OverlayService.instance?.restoreOverlayAfterPicker()
+        }
     }
 }
