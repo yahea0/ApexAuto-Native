@@ -51,14 +51,15 @@ class OverlayService : Service() {
         const val ACTION_RUN_MINI_CONTROLLER = "ACTION_RUN_MINI_CONTROLLER"
         const val EXTRA_SCRIPT_NAME = "EXTRA_SCRIPT_NAME"
 
+        // إضافة هدف جديد معزول تماماً ومربوط باسم السكربت الحالي
         fun addGalleryTarget(bitmap: Bitmap) {
             instance?.let { service ->
                 service.mainHandler.post {
                     val nextNum = service.stepsList.size + 1
-                    val targetName = "target_$nextNum"
+                    val targetName = "${service.currentScriptName}_target_$nextNum"
                     val newStep = MacroStep(
                         stepNumber = nextNum,
-                        name = targetName,
+                        name = "target_$nextNum",
                         type = ActionType.CLICK_IMAGE,
                         targetImageName = targetName,
                         thumbnail = bitmap,
@@ -68,6 +69,10 @@ class OverlayService : Service() {
                     )
                     ImageLibrary.saveTarget(targetName, bitmap)
                     service.stepsList.add(newStep)
+
+                    // حفظ تلقائي فوري في مجلد السكربت لضمان عدم ضياع الصور
+                    ScriptStorage.saveScript(service.currentScriptName, service.stepsList, service.loopCountLimit)
+
                     service.renderMainJobsView()
                     service.togglePanelExpansion(true)
                 }
@@ -79,6 +84,7 @@ class OverlayService : Service() {
                 service.mainHandler.post {
                     if (stepIndex in 0 until service.stepsList.size) {
                         service.stepsList[stepIndex].trainedVariations.add(bitmap)
+                        ScriptStorage.saveScript(service.currentScriptName, service.stepsList, service.loopCountLimit)
                         Toast.makeText(service.applicationContext, "✓ أضيفت زاوية تدريبية جديدة بنجاح!", Toast.LENGTH_SHORT).show()
                         service.showActionSettingsDialog(stepIndex)
                     }
@@ -95,6 +101,7 @@ class OverlayService : Service() {
                             step.name = newName
                         }
                     }
+                    ScriptStorage.saveScript(service.currentScriptName, service.stepsList, service.loopCountLimit)
                     service.renderMainJobsView()
                 }
             }
@@ -118,7 +125,7 @@ class OverlayService : Service() {
     private var isAttached = false
     private var loopCountLimit = 0
     private var currentExecutionIndex = 0
-    private var currentScriptName = "السكربت الحالي"
+    var currentScriptName = "Script_1"
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -273,7 +280,6 @@ class OverlayService : Service() {
         rootContainer.addView(suitePanel)
         rootContainer.addView(miniControllerView)
 
-        // معالجة السحب والضغط بدقة
         bubbleView.setOnTouchListener(createDragTouchListener(params) {
             togglePanelExpansion(true)
         })
@@ -355,18 +361,15 @@ class OverlayService : Service() {
             }
         }
 
-        // 1. تشغيل من البداية
         btnsRow.addView(makeMiniActionBtn("▶ من البداية", Color.parseColor("#FFD700"), Color.parseColor("#0B0C10")) {
             startExecutionFromBeginning()
         })
 
-        // 2. إيقاف (Stop)
         btnsRow.addView(makeMiniActionBtn("⏹ إيقاف", Color.parseColor("#EF4444"), Color.WHITE) {
             stopExecution()
             miniStatusText.text = "⏹ متوقف عند الخطوة (${currentExecutionIndex + 1})"
         })
 
-        // 3. تكملة الخطوات (Resume)
         btnsRow.addView(makeMiniActionBtn("⏯ تكملة", Color.parseColor("#00E676"), Color.parseColor("#042614")) {
             resumeExecution()
         })
@@ -374,7 +377,6 @@ class OverlayService : Service() {
         miniControllerView.addView(btnsRow)
     }
 
-    // تم تصحيح المعاملات بدقة لدعم الضغط والنقر الاختياري
     private fun createDragTouchListener(params: WindowManager.LayoutParams, onClick: (() -> Unit)? = null): View.OnTouchListener {
         return object : View.OnTouchListener {
             private var initialX = 0
@@ -557,6 +559,7 @@ class OverlayService : Service() {
                 setPadding((4 * density).toInt(), 0, 0, 0)
                 setOnClickListener {
                     stepsList.removeAt(index)
+                    ScriptStorage.saveScript(currentScriptName, stepsList, loopCountLimit)
                     renderMainJobsView()
                 }
             }
@@ -717,7 +720,7 @@ class OverlayService : Service() {
 
         val editName = EditText(this).apply {
             hint = "اسم السكربت (مثال: FarmScript)"
-            setText(if (currentScriptName == "السكربت الحالي") "Script_${stepsList.size}_steps" else currentScriptName)
+            setText(currentScriptName)
             setTextColor(Color.WHITE)
             textSize = 13f
             background = GradientDrawable().apply {
@@ -750,9 +753,9 @@ class OverlayService : Service() {
             setOnClickListener {
                 val name = editName.text.toString().trim()
                 if (name.isNotBlank()) {
+                    currentScriptName = name
                     val ok = ScriptStorage.saveScript(name, stepsList, loopCountLimit)
                     if (ok) {
-                        currentScriptName = name
                         Toast.makeText(this@OverlayService, "✓ تم حفظ السكربت ($name) بنجاح!", Toast.LENGTH_SHORT).show()
                         renderMainJobsView()
                     } else {
@@ -889,6 +892,7 @@ class OverlayService : Service() {
         suitePanel.addView(btnBack)
     }
 
+    // تفريغ وتحميل السكربت المحدد حصراً مع صوره المستقلة
     fun loadScriptForEditing(name: String) {
         val data = ScriptStorage.loadScript(name)
         if (data != null) {
@@ -900,7 +904,7 @@ class OverlayService : Service() {
             stopExecution()
             miniControllerView.visibility = View.GONE
             togglePanelExpansion(true)
-            Toast.makeText(this, "تم تحميل السكربت للتعديل!", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "تم تحميل السكربت ($name) للتعديل!", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -918,7 +922,7 @@ class OverlayService : Service() {
             suitePanel.visibility = View.GONE
             miniControllerView.visibility = View.VISIBLE
             miniStatusText.text = "⚡ $name (جاهز)"
-            Toast.makeText(this, "تم تفعيل المتحكم العائم للسكربت!", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "تم تفعيل المتحكم العائم للسكربت ($name)!", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -1010,6 +1014,7 @@ class OverlayService : Service() {
             delayAfterMs = 300L
         )
         stepsList.add(newStep)
+        ScriptStorage.saveScript(currentScriptName, stepsList, loopCountLimit)
         renderMainJobsView()
         openJsEditor(stepsList.size - 1)
     }
@@ -1178,6 +1183,7 @@ class OverlayService : Service() {
                     }
                     setOnLongClickListener {
                         step.trainedVariations.removeAt(vIndex)
+                        ScriptStorage.saveScript(currentScriptName, stepsList, loopCountLimit)
                         showActionSettingsDialog(index)
                         true
                     }
@@ -1231,6 +1237,7 @@ class OverlayService : Service() {
                 step.name = editName.text.toString()
                 step.delayAfterMs = editDelay.text.toString().toLongOrNull() ?: 500L
                 step.repeatCount = editRepeat.text.toString().toIntOrNull() ?: 1
+                ScriptStorage.saveScript(currentScriptName, stepsList, loopCountLimit)
                 renderMainJobsView()
             }
         }
@@ -1340,6 +1347,7 @@ class OverlayService : Service() {
             setOnClickListener {
                 step.similarityPercent = editSim.text.toString().toIntOrNull() ?: 70
                 step.detectScope = DetectScope.FULL_SCREEN
+                ScriptStorage.saveScript(currentScriptName, stepsList, loopCountLimit)
                 renderMainJobsView()
             }
         }
@@ -1526,19 +1534,13 @@ class OverlayService : Service() {
                 (28 * density).toInt()
             )
             setOnClickListener {
-                val targets = ImageLibrary.targetImages.keys.toList()
-                if (targets.isNotEmpty()) {
-                    insertSnippet("\"${targets.first()}\"")
-                } else {
-                    Toast.makeText(this@OverlayService, "المستودع فارغ حالياً", Toast.LENGTH_SHORT).show()
-                }
+                insertSnippet("\"${step.targetImageName}\"")
             }
         }
         toolbarContainer.addView(btnPickTargetName)
 
         toolbarScroll.addView(toolbarContainer)
         suitePanel.addView(toolbarScroll)
-
         suitePanel.addView(editCode)
 
         val btnSave = Button(this).apply {
@@ -1557,6 +1559,7 @@ class OverlayService : Service() {
             ).apply { topMargin = (10 * density).toInt() }
             setOnClickListener {
                 step.customScript = editCode.text.toString()
+                ScriptStorage.saveScript(currentScriptName, stepsList, loopCountLimit)
                 renderMainJobsView()
             }
         }
@@ -1614,6 +1617,7 @@ class OverlayService : Service() {
             ).apply { topMargin = (12 * density).toInt() }
             setOnClickListener {
                 loopCountLimit = editLoop.text.toString().toIntOrNull() ?: 0
+                ScriptStorage.saveScript(currentScriptName, stepsList, loopCountLimit)
                 renderMainJobsView()
             }
         }
@@ -1625,6 +1629,7 @@ class OverlayService : Service() {
         if (target in 0 until stepsList.size) {
             val item = stepsList.removeAt(index)
             stepsList.add(target, item)
+            ScriptStorage.saveScript(currentScriptName, stepsList, loopCountLimit)
             renderMainJobsView()
         }
     }
