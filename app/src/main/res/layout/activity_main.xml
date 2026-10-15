@@ -112,7 +112,7 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="24dp"
+            android:layout_marginBottom="16dp"
             android:background="@drawable/bg_glass_card"
             android:elevation="6dp"
             android:orientation="vertical"
@@ -144,6 +144,47 @@
                 android:background="@drawable/bg_glass_card"
                 android:stateListAnimator="@null"
                 android:text="📁 إدارة مستودع الصور والأهداف"
+                android:textColor="@color/neon_gold"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- 4. مستودع السكربتات المحفوظة -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="28dp"
+            android:background="@drawable/bg_glass_card"
+            android:elevation="6dp"
+            android:orientation="vertical"
+            android:padding="20dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="right"
+                android:text="4. مستودع السكربتات (Scripts Repository)"
+                android:textColor="@color/neon_gold"
+                android:textSize="17sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:gravity="right"
+                android:text="استعراض السكربتات المحفوظة، تشغيلها بضغطة زر، أو تعديل خطواتها"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
+
+            <Button
+                android:id="@+id/btn_open_scripts_repository"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginTop="16dp"
+                android:background="@drawable/bg_glass_card"
+                android:stateListAnimator="@null"
+                android:text="📜 إدارة مستودع السكربتات"
                 android:textColor="@color/neon_gold"
                 android:textSize="14sp"
                 android:textStyle="bold" />
