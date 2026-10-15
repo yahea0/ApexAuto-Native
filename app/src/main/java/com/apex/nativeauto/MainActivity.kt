@@ -21,11 +21,15 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.apex.nativeauto.capture.ImageMatcher
 import com.apex.nativeauto.macro.ImageLibrary
+import com.apex.nativeauto.macro.ScriptStorage
 import com.apex.nativeauto.overlay.OverlayService
 import java.io.File
 import java.io.FileOutputStream
 
 class MainActivity : AppCompatActivity() {
+
+    private var pendingScriptName: String? = null
+    private var pendingScriptMode: String? = null
 
     private val captureLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -34,8 +38,14 @@ class MainActivity : AppCompatActivity() {
             val serviceIntent = Intent(this, OverlayService::class.java).apply {
                 putExtra("EXTRA_RESULT_CODE", result.resultCode)
                 putExtra("EXTRA_DATA", result.data)
+                pendingScriptName?.let {
+                    putExtra(OverlayService.EXTRA_SCRIPT_NAME, it)
+                    action = pendingScriptMode
+                }
             }
             ContextCompat.startForegroundService(this, serviceIntent)
+            pendingScriptName = null
+            pendingScriptMode = null
             Toast.makeText(this, "تم تفعيل محرك الذكاء الاصطناعي بنجاح!", Toast.LENGTH_SHORT).show()
         } else {
             Toast.makeText(this, "يلزم السماح بالتقاط الشاشة لاقتطاع الصور وفحصها", Toast.LENGTH_LONG).show()
@@ -68,11 +78,13 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         ImageLibrary.init(this)
+        ScriptStorage.init(this)
         prepareYOLOModel()
 
         val btnAccessibility = findViewById<Button?>(R.id.btn_enable_accessibility)
         val btnStartOverlay = findViewById<Button?>(R.id.btn_start_overlay)
         val btnOpenLibrary = findViewById<Button?>(R.id.btn_open_library)
+        val btnOpenScripts = findViewById<Button?>(R.id.btn_open_scripts_repository)
 
         btnAccessibility?.setOnClickListener {
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
@@ -80,21 +92,215 @@ class MainActivity : AppCompatActivity() {
         }
 
         btnStartOverlay?.setOnClickListener {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
-                startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
-                return@setOnClickListener
-            }
-
-            val mpManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-            captureLauncher.launch(mpManager.createScreenCaptureIntent())
+            startOverlayWithAction(null, null)
         }
 
         btnOpenLibrary?.setOnClickListener {
             openLibraryManagerDialog()
         }
+
+        btnOpenScripts?.setOnClickListener {
+            openScriptsRepositoryDialog()
+        }
     }
 
-    // نافذة استعراض المستودع بتصميم زجاجي حديث (Glassmorphic Window)
+    private fun startOverlayWithAction(scriptName: String?, actionType: String?) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+            startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+            return
+        }
+
+        if (OverlayService.isRunning) {
+            val intent = Intent(this, OverlayService::class.java).apply {
+                action = actionType
+                putExtra(OverlayService.EXTRA_SCRIPT_NAME, scriptName)
+            }
+            startService(intent)
+        } else {
+            pendingScriptName = scriptName
+            pendingScriptMode = actionType
+            val mpManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+            captureLauncher.launch(mpManager.createScreenCaptureIntent())
+        }
+    }
+
+    // نافذة مستودع السكربتات المحفوظة
+    private fun openScriptsRepositoryDialog() {
+        val dialog = Dialog(this)
+        dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+
+        val density = resources.displayMetrics.density
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding((18 * density).toInt(), (18 * density).toInt(), (18 * density).toInt(), (18 * density).toInt())
+            background = GradientDrawable().apply {
+                cornerRadius = 24 * density
+                setColor(Color.parseColor("#F20F1626"))
+                setStroke((1.2f * density).toInt(), Color.parseColor("#4DFFD700"))
+            }
+            layoutParams = ViewGroup.LayoutParams((340 * density).toInt(), (460 * density).toInt())
+        }
+
+        val title = TextView(this).apply {
+            text = "📜 مستودع السكربتات (Scripts Repository)"
+            setTextColor(Color.parseColor("#FFD700"))
+            textSize = 15f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, (12 * density).toInt())
+        }
+        root.addView(title)
+
+        val scripts = ScriptStorage.getAllScripts()
+
+        val scroll = ScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0, 1f
+            )
+            isVerticalScrollBarEnabled = false
+        }
+
+        val container = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+
+        if (scripts.isEmpty()) {
+            val emptyTxt = TextView(this).apply {
+                text = "لا توجد سكربتات محفوظة بعد.\nيمكنك حفظ السكربت الحالي من الاستوديو العائم عبر زر 💾"
+                setTextColor(Color.parseColor("#94A3B8"))
+                textSize = 12f
+                gravity = Gravity.CENTER
+                setPadding(0, (40 * density).toInt(), 0, 0)
+            }
+            container.addView(emptyTxt)
+        } else {
+            scripts.forEach { sName ->
+                val card = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding((12 * density).toInt(), (10 * density).toInt(), (12 * density).toInt(), (10 * density).toInt())
+                    background = GradientDrawable().apply {
+                        cornerRadius = 14 * density
+                        setColor(Color.parseColor("#14FFFFFF"))
+                        setStroke(1, Color.parseColor("#26FFFFFF"))
+                    }
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply { topMargin = (8 * density).toInt() }
+                }
+
+                // سطر العنوان وأيقونة الحذف
+                val topRow = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                }
+
+                val txtName = TextView(this).apply {
+                    text = "⚡ $sName"
+                    setTextColor(Color.parseColor("#FFD700"))
+                    textSize = 14f
+                    typeface = android.graphics.Typeface.DEFAULT_BOLD
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                }
+
+                val btnDelete = TextView(this).apply {
+                    text = "🗑"
+                    textSize = 14f
+                    setPadding((8 * density).toInt(), 0, 0, 0)
+                    setOnClickListener {
+                        ScriptStorage.deleteScript(sName)
+                        dialog.dismiss()
+                        openScriptsRepositoryDialog()
+                    }
+                }
+
+                topRow.addView(txtName)
+                topRow.addView(btnDelete)
+                card.addView(topRow)
+
+                // سطر الأزرار الرئيسية: [تعديل السكربت] و [تشغيل السكربت]
+                val actionsRow = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        (38 * density).toInt()
+                    ).apply { topMargin = (8 * density).toInt() }
+                }
+
+                // أولاً: خيار تعديل السكربت
+                val btnEdit = Button(this).apply {
+                    text = "✏️ تعديل السكربت"
+                    setTextColor(Color.WHITE)
+                    textSize = 11.5f
+                    typeface = android.graphics.Typeface.DEFAULT_BOLD
+                    stateListAnimator = null
+                    background = GradientDrawable().apply {
+                        cornerRadius = 10 * density
+                        setColor(Color.parseColor("#1FFFFFFF"))
+                        setStroke(1, Color.parseColor("#33FFFFFF"))
+                    }
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f).apply {
+                        marginEnd = (4 * density).toInt()
+                    }
+                    setOnClickListener {
+                        startOverlayWithAction(sName, OverlayService.ACTION_EDIT_SCRIPT)
+                        dialog.dismiss()
+                    }
+                }
+
+                // ثانياً: خيار تشغيل السكربت
+                val btnRun = Button(this).apply {
+                    text = "▶️ تشغيل السكربت"
+                    setTextColor(Color.parseColor("#042614"))
+                    textSize = 11.5f
+                    typeface = android.graphics.Typeface.DEFAULT_BOLD
+                    stateListAnimator = null
+                    background = GradientDrawable().apply {
+                        cornerRadius = 10 * density
+                        setColor(Color.parseColor("#00E676"))
+                    }
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f).apply {
+                        marginStart = (4 * density).toInt()
+                    }
+                    setOnClickListener {
+                        startOverlayWithAction(sName, OverlayService.ACTION_RUN_MINI_CONTROLLER)
+                        dialog.dismiss()
+                    }
+                }
+
+                actionsRow.addView(btnEdit)
+                actionsRow.addView(btnRun)
+                card.addView(actionsRow)
+
+                container.addView(card)
+            }
+        }
+
+        scroll.addView(container)
+        root.addView(scroll)
+
+        val btnClose = Button(this).apply {
+            text = "إغلاق"
+            setTextColor(Color.parseColor("#94A3B8"))
+            textSize = 13f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            stateListAnimator = null
+            background = GradientDrawable().apply {
+                cornerRadius = 14 * density
+                setColor(Color.parseColor("#14FFFFFF"))
+                setStroke(1, Color.parseColor("#1FFFFFFF"))
+            }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (42 * density).toInt()
+            ).apply { topMargin = (10 * density).toInt() }
+            setOnClickListener { dialog.dismiss() }
+        }
+        root.addView(btnClose)
+
+        dialog.setContentView(root)
+        dialog.show()
+    }
+
     private fun openLibraryManagerDialog() {
         val dialog = Dialog(this)
         dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
@@ -105,8 +311,8 @@ class MainActivity : AppCompatActivity() {
             setPadding((18 * density).toInt(), (18 * density).toInt(), (18 * density).toInt(), (18 * density).toInt())
             background = GradientDrawable().apply {
                 cornerRadius = 24 * density
-                setColor(Color.parseColor("#F20F1626")) // زجاج كحلي داكن
-                setStroke((1.2f * density).toInt(), Color.parseColor("#4DFFD700")) // حافة ذهبية خافتة
+                setColor(Color.parseColor("#F20F1626"))
+                setStroke((1.2f * density).toInt(), Color.parseColor("#4DFFD700"))
             }
             layoutParams = ViewGroup.LayoutParams((330 * density).toInt(), (440 * density).toInt())
         }
@@ -155,7 +361,7 @@ class MainActivity : AppCompatActivity() {
                 setPadding((10 * density).toInt(), (10 * density).toInt(), (10 * density).toInt(), (10 * density).toInt())
                 background = GradientDrawable().apply {
                     cornerRadius = 14 * density
-                    setColor(Color.parseColor("#14FFFFFF")) // كبسولة زجاجية شفافة
+                    setColor(Color.parseColor("#14FFFFFF"))
                     setStroke(1, Color.parseColor("#26FFFFFF"))
                 }
                 layoutParams = LinearLayout.LayoutParams(
@@ -231,7 +437,6 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
     }
 
-    // نافذة تعديل الاسم الزجاجية (Glassmorphic Dialog)
     private fun showRenameDialog(oldName: String, onRenamed: (String) -> Unit) {
         val d = Dialog(this)
         d.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
