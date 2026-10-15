@@ -1,34 +1,69 @@
 package com.apex.nativeauto.macro
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.RectF
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.io.FileOutputStream
 
 object ScriptStorage {
-    private var scriptsDir: File? = null
+    private var baseDir: File? = null
 
     fun init(context: Context) {
-        scriptsDir = File(context.filesDir, "saved_scripts").apply { mkdirs() }
+        baseDir = File(context.filesDir, "macro_scripts").apply { mkdirs() }
     }
 
-    // حفظ السكربت بكافة تفاصيله وخطواته
+    // حفظ السكربت مع عزل صوره بالكامل داخل مجلد خاص به
     fun saveScript(name: String, steps: List<MacroStep>, loopLimit: Int = 0): Boolean {
         return try {
-            val dir = scriptsDir ?: return false
+            val parent = baseDir ?: return false
+            // مجلد مخصص ومعزول للسكربت الحالي فقط
+            val scriptFolder = File(parent, name).apply { mkdirs() }
+
             val root = JSONObject().apply {
                 put("name", name)
                 put("loopLimit", loopLimit)
                 put("timestamp", System.currentTimeMillis())
 
                 val stepsArray = JSONArray()
-                steps.forEach { step ->
+                steps.forEachIndexed { index, step ->
+                    val stepNum = index + 1
+                    step.stepNumber = stepNum
+
+                    // 1. حفظ صورة الهدف الأساسية في مجلد هذا السكربت فقط
+                    val thumbFileName = "thumb_$stepNum.png"
+                    if (step.thumbnail != null) {
+                        val thumbFile = File(scriptFolder, thumbFileName)
+                        FileOutputStream(thumbFile).use { out ->
+                            step.thumbnail!!.compress(Bitmap.CompressFormat.PNG, 100, out)
+                        }
+                    }
+
+                    // 2. حفظ الزوايا التدريبية إن وُجدت في نفس المجلد المعزول
+                    val varsArray = JSONArray()
+                    step.trainedVariations.forEachIndexed { vIdx, vBmp ->
+                        val varFileName = "var_${stepNum}_$vIdx.png"
+                        val varFile = File(scriptFolder, varFileName)
+                        FileOutputStream(varFile).use { out ->
+                            vBmp.compress(Bitmap.CompressFormat.PNG, 100, out)
+                        }
+                        varsArray.put(varFileName)
+                    }
+
+                    // ربط اسم الهدف باسم السكربت لمنع التضارب
+                    val uniqueTargetName = "${name}_target_$stepNum"
+                    step.targetImageName = uniqueTargetName
+
                     val sObj = JSONObject().apply {
-                        put("stepNumber", step.stepNumber)
+                        put("stepNumber", stepNum)
                         put("name", step.name)
                         put("type", step.type.name)
-                        put("targetImageName", step.targetImageName)
+                        put("targetImageName", uniqueTargetName)
+                        put("thumbFile", if (step.thumbnail != null) thumbFileName else "")
+                        put("variations", varsArray)
                         put("similarityPercent", step.similarityPercent)
                         put("detectScope", step.detectScope.name)
                         put("repeatCount", step.repeatCount)
@@ -46,8 +81,8 @@ object ScriptStorage {
                 put("steps", stepsArray)
             }
 
-            val file = File(dir, "$name.json")
-            file.writeText(root.toString(2))
+            val configFile = File(scriptFolder, "script.json")
+            configFile.writeText(root.toString(2))
             true
         } catch (e: Exception) {
             e.printStackTrace()
@@ -55,14 +90,22 @@ object ScriptStorage {
         }
     }
 
-    // استرجاع السكربت المحفوظ وإعادة بناء الكائنات
+    // استرجاع السكربت مع قراءة صوره حصراً من مجلده الخاص
     fun loadScript(name: String): Pair<List<MacroStep>, Int>? {
         return try {
-            val dir = scriptsDir ?: return null
-            val file = File(dir, "$name.json")
-            if (!file.exists()) return null
+            val parent = baseDir ?: return null
+            val scriptFolder = File(parent, name)
+            val configFile = File(scriptFolder, "script.json")
+            val legacyFile = File(parent, "$name.json")
 
-            val jsonStr = file.readText()
+            val jsonStr = if (configFile.exists()) {
+                configFile.readText()
+            } else if (legacyFile.exists()) {
+                legacyFile.readText()
+            } else {
+                return null
+            }
+
             val root = JSONObject(jsonStr)
             val loopLimit = root.optInt("loopLimit", 0)
             val stepsArray = root.getJSONArray("steps")
@@ -70,12 +113,43 @@ object ScriptStorage {
             val stepsList = mutableListOf<MacroStep>()
             for (i in 0 until stepsArray.length()) {
                 val sObj = stepsArray.getJSONObject(i)
-                val targetName = sObj.optString("targetImageName", "")
-                val bmp = ImageLibrary.getTarget(targetName)
+                val stepNum = sObj.optInt("stepNumber", i + 1)
+                val targetName = sObj.optString("targetImageName", "${name}_target_$stepNum")
+                val thumbFileName = sObj.optString("thumbFile", "")
+
+                // استرجاع صورة الهدف من مجلد السكربت المعزول
+                var bmp: Bitmap? = null
+                if (thumbFileName.isNotBlank()) {
+                    val tFile = File(scriptFolder, thumbFileName)
+                    if (tFile.exists()) {
+                        bmp = BitmapFactory.decodeFile(tFile.absolutePath)
+                    }
+                }
+                if (bmp == null && targetName.isNotBlank()) {
+                    bmp = ImageLibrary.getTarget(targetName)
+                }
+
+                // استرجاع الزوايا التدريبية من نفس المجلد
+                val trainedVars = mutableListOf<Bitmap>()
+                val varsArray = sObj.optJSONArray("variations")
+                if (varsArray != null) {
+                    for (v in 0 until varsArray.length()) {
+                        val vFileName = varsArray.getString(v)
+                        val vFile = File(scriptFolder, vFileName)
+                        if (vFile.exists()) {
+                            BitmapFactory.decodeFile(vFile.absolutePath)?.let { trainedVars.add(it) }
+                        }
+                    }
+                }
+
+                // تسجيل الصورة في الذاكرة باسمها المعزول لتتمكن C++ و OpenCV من مطابقتها
+                if (bmp != null) {
+                    ImageLibrary.saveTarget(targetName, bmp)
+                }
 
                 val step = MacroStep(
-                    stepNumber = sObj.optInt("stepNumber", i + 1),
-                    name = sObj.optString("name", "Step ${i + 1}"),
+                    stepNumber = stepNum,
+                    name = sObj.optString("name", "Step $stepNum"),
                     type = try { ActionType.valueOf(sObj.optString("type", ActionType.CLICK_IMAGE.name)) } catch (e: Exception) { ActionType.CLICK_IMAGE },
                     targetArea = RectF(
                         sObj.optDouble("left", 0.0).toFloat(),
@@ -85,6 +159,7 @@ object ScriptStorage {
                     ),
                     targetImageName = targetName,
                     thumbnail = bmp,
+                    trainedVariations = trainedVars,
                     similarityPercent = sObj.optInt("similarityPercent", 70),
                     detectScope = try { DetectScope.valueOf(sObj.optString("detectScope", DetectScope.FULL_SCREEN.name)) } catch (e: Exception) { DetectScope.FULL_SCREEN },
                     repeatCount = sObj.optInt("repeatCount", 1),
@@ -103,15 +178,30 @@ object ScriptStorage {
     }
 
     fun getAllScripts(): List<String> {
-        val dir = scriptsDir ?: return emptyList()
-        return dir.listFiles { file -> file.extension.equals("json", ignoreCase = true) }
-            ?.map { it.nameWithoutExtension }
-            ?: emptyList()
+        val parent = baseDir ?: return emptyList()
+        val list = mutableListOf<String>()
+
+        parent.listFiles()?.forEach { file ->
+            if (file.isDirectory && File(file, "script.json").exists()) {
+                list.add(file.name)
+            } else if (file.isFile && file.extension.equals("json", ignoreCase = true)) {
+                val n = file.nameWithoutExtension
+                if (!list.contains(n)) list.add(n)
+            }
+        }
+        return list.sorted()
     }
 
     fun deleteScript(name: String): Boolean {
-        val dir = scriptsDir ?: return false
-        val file = File(dir, "$name.json")
-        return file.delete()
+        val parent = baseDir ?: return false
+        val folder = File(parent, name)
+        if (folder.exists()) {
+            folder.deleteRecursively()
+        }
+        val legacy = File(parent, "$name.json")
+        if (legacy.exists()) {
+            legacy.delete()
+        }
+        return true
     }
 }
