@@ -94,7 +94,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // نافذة استعراض المستودع وتعديل أسماء الصور وحذفها
+    // نافذة استعراض المستودع بتصميم زجاجي حديث (Glassmorphic Window)
     private fun openLibraryManagerDialog() {
         val dialog = Dialog(this)
         dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
@@ -102,30 +102,35 @@ class MainActivity : AppCompatActivity() {
         val density = resources.displayMetrics.density
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding((16 * density).toInt(), (16 * density).toInt(), (16 * density).toInt(), (16 * density).toInt())
-            val bg = GradientDrawable().apply {
-                cornerRadius = 20 * density
-                setColor(Color.parseColor("#F50D0E15"))
-                setStroke((2 * density).toInt(), Color.parseColor("#D4AF37"))
+            setPadding((18 * density).toInt(), (18 * density).toInt(), (18 * density).toInt(), (18 * density).toInt())
+            background = GradientDrawable().apply {
+                cornerRadius = 24 * density
+                setColor(Color.parseColor("#F20F1626")) // زجاج كحلي داكن
+                setStroke((1.2f * density).toInt(), Color.parseColor("#4DFFD700")) // حافة ذهبية خافتة
             }
-            background = bg
-            layoutParams = ViewGroup.LayoutParams((320 * density).toInt(), (400 * density).toInt())
+            layoutParams = ViewGroup.LayoutParams((330 * density).toInt(), (440 * density).toInt())
         }
 
         val title = TextView(this).apply {
-            text = "📁 مستودع الصور وتدريب الذكاء الاصطناعي"
+            text = "📁 مستودع الصور والأهداف الذكية"
             setTextColor(Color.parseColor("#FFD700"))
-            textSize = 15f
+            textSize = 16f
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
-            setPadding(0, 0, 0, (12 * density).toInt())
+            setPadding(0, 0, 0, (14 * density).toInt())
         }
         root.addView(title)
 
         val btnAdd = Button(this).apply {
             text = "➕ استيراد صورة جديدة من المعرض"
             setTextColor(Color.parseColor("#0B0C10"))
-            setBackgroundColor(Color.parseColor("#FFD700"))
+            textSize = 13f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            stateListAnimator = null
+            background = GradientDrawable().apply {
+                cornerRadius = 14 * density
+                setColor(Color.parseColor("#FFD700"))
+            }
             setOnClickListener {
                 dialog.dismiss()
                 libraryAddLauncher.launch("image/*")
@@ -137,7 +142,8 @@ class MainActivity : AppCompatActivity() {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 0, 1f
-            ).apply { topMargin = (10 * density).toInt() }
+            ).apply { topMargin = (12 * density).toInt() }
+            isVerticalScrollBarEnabled = false
         }
 
         val container = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
@@ -146,32 +152,31 @@ class MainActivity : AppCompatActivity() {
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
-                setPadding((8 * density).toInt(), (8 * density).toInt(), (8 * density).toInt(), (8 * density).toInt())
-                val rBg = GradientDrawable().apply {
-                    cornerRadius = 10 * density
-                    setColor(Color.parseColor("#151722"))
-                    setStroke(1, Color.parseColor("#333A4D"))
+                setPadding((10 * density).toInt(), (10 * density).toInt(), (10 * density).toInt(), (10 * density).toInt())
+                background = GradientDrawable().apply {
+                    cornerRadius = 14 * density
+                    setColor(Color.parseColor("#14FFFFFF")) // كبسولة زجاجية شفافة
+                    setStroke(1, Color.parseColor("#26FFFFFF"))
                 }
-                background = rBg
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { topMargin = (6 * density).toInt() }
+                ).apply { topMargin = (8 * density).toInt() }
             }
 
             val img = ImageView(this).apply {
                 setImageBitmap(bmp)
                 scaleType = ImageView.ScaleType.FIT_CENTER
-                layoutParams = LinearLayout.LayoutParams((40 * density).toInt(), (40 * density).toInt()).apply {
-                    marginEnd = (8 * density).toInt()
+                layoutParams = LinearLayout.LayoutParams((42 * density).toInt(), (42 * density).toInt()).apply {
+                    marginEnd = (10 * density).toInt()
                 }
             }
 
-            // ضغطة على الاسم تفتح نافذة إعادة تسميته فورياً
             val txt = TextView(this).apply {
-                text = "$name ✏️"
-                setTextColor(Color.WHITE)
-                textSize = 12f
+                text = "$name  ✏️"
+                setTextColor(Color.parseColor("#F8FAFC"))
+                textSize = 13f
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                 setOnClickListener {
                     showRenameDialog(name) { newName ->
@@ -185,8 +190,8 @@ class MainActivity : AppCompatActivity() {
 
             val btnDel = TextView(this).apply {
                 text = "🗑"
-                textSize = 14f
-                setPadding((8 * density).toInt(), 0, (4 * density).toInt(), 0)
+                textSize = 15f
+                setPadding((10 * density).toInt(), (4 * density).toInt(), (6 * density).toInt(), (4 * density).toInt())
                 setOnClickListener {
                     ImageLibrary.deleteTarget(name)
                     dialog.dismiss()
@@ -205,8 +210,19 @@ class MainActivity : AppCompatActivity() {
 
         val btnClose = Button(this).apply {
             text = "إغلاق"
-            setTextColor(Color.WHITE)
-            setBackgroundColor(Color.parseColor("#1F222E"))
+            setTextColor(Color.parseColor("#94A3B8"))
+            textSize = 13f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            stateListAnimator = null
+            background = GradientDrawable().apply {
+                cornerRadius = 14 * density
+                setColor(Color.parseColor("#14FFFFFF"))
+                setStroke(1, Color.parseColor("#1FFFFFFF"))
+            }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (44 * density).toInt()
+            ).apply { topMargin = (10 * density).toInt() }
             setOnClickListener { dialog.dismiss() }
         }
         root.addView(btnClose)
@@ -215,6 +231,7 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
     }
 
+    // نافذة تعديل الاسم الزجاجية (Glassmorphic Dialog)
     private fun showRenameDialog(oldName: String, onRenamed: (String) -> Unit) {
         val d = Dialog(this)
         d.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
@@ -222,34 +239,51 @@ class MainActivity : AppCompatActivity() {
 
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding((16 * density).toInt(), (16 * density).toInt(), (16 * density).toInt(), (16 * density).toInt())
-            val bg = GradientDrawable().apply {
-                cornerRadius = 16 * density
-                setColor(Color.parseColor("#151722"))
-                setStroke(2, Color.parseColor("#FFD700"))
+            setPadding((18 * density).toInt(), (18 * density).toInt(), (18 * density).toInt(), (18 * density).toInt())
+            background = GradientDrawable().apply {
+                cornerRadius = 20 * density
+                setColor(Color.parseColor("#F50D1322"))
+                setStroke((1.5f * density).toInt(), Color.parseColor("#4DFFD700"))
             }
-            background = bg
         }
 
         val t = TextView(this).apply {
             text = "تعديل اسم الهدف"
             setTextColor(Color.parseColor("#FFD700"))
-            textSize = 14f
+            textSize = 15f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, (12 * density).toInt())
         }
         layout.addView(t)
 
         val input = EditText(this).apply {
             setText(oldName)
-            setTextColor(Color.WHITE)
-            setBackgroundColor(Color.parseColor("#0B0C10"))
-            setPadding(16, 12, 16, 12)
+            setTextColor(Color.parseColor("#38BDF8"))
+            textSize = 14f
+            background = GradientDrawable().apply {
+                cornerRadius = 12 * density
+                setColor(Color.parseColor("#1FFFFFFF"))
+                setStroke(1, Color.parseColor("#33FFFFFF"))
+            }
+            setPadding((14 * density).toInt(), (10 * density).toInt(), (14 * density).toInt(), (10 * density).toInt())
         }
         layout.addView(input)
 
         val btn = Button(this).apply {
             text = "تأكيد وتحديث في كل مكان"
             setTextColor(Color.parseColor("#0B0C10"))
-            setBackgroundColor(Color.parseColor("#FFD700"))
+            textSize = 13f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            stateListAnimator = null
+            background = GradientDrawable().apply {
+                cornerRadius = 14 * density
+                setColor(Color.parseColor("#FFD700"))
+            }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (44 * density).toInt()
+            ).apply { topMargin = (14 * density).toInt() }
             setOnClickListener {
                 val newName = input.text.toString().trim()
                 if (newName.isNotBlank()) {
