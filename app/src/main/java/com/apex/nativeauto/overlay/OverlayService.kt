@@ -4,6 +4,8 @@ import android.app.Activity
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
@@ -52,7 +54,8 @@ class OverlayService : Service() {
                         targetImageName = targetName,
                         thumbnail = bitmap,
                         similarityPercent = 70,
-                        detectScope = DetectScope.FULL_SCREEN
+                        detectScope = DetectScope.FULL_SCREEN,
+                        customScript = "" // فارغ كلياً
                     )
                     ImageLibrary.saveTarget(targetName, bitmap)
                     service.stepsList.add(newStep)
@@ -166,8 +169,8 @@ class OverlayService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = 50
-            y = 220
+            x = 40
+            y = 200
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -191,12 +194,24 @@ class OverlayService : Service() {
         }
     }
 
+    // دالة تكبير / تصغير نافذة الاستوديو ديناميكياً
+    private fun setPanelDimensions(expandedForEditor: Boolean) {
+        val density = resources.displayMetrics.density
+        val targetWidth = if (expandedForEditor) {
+            min((ScreenCaptureManager.screenWidth * 0.94f).toInt(), (400 * density).toInt())
+        } else {
+            (345 * density).toInt()
+        }
+        val layoutParams = suitePanel.layoutParams
+        layoutParams.width = targetWidth
+        suitePanel.layoutParams = layoutParams
+    }
+
     private fun buildOverlayUI() {
         val params = getOverlayLayoutParams()
         rootContainer = FrameLayout(this)
         val density = resources.displayMetrics.density
 
-        // الفقاعة العائمة الملكية - زجاج مصنفر خفيف بتوهج ذهبي
         bubbleView = TextView(this).apply {
             text = "⚡"
             textSize = 21f
@@ -210,7 +225,6 @@ class OverlayService : Service() {
             layoutParams = FrameLayout.LayoutParams((50 * density).toInt(), (50 * density).toInt())
         }
 
-        // لوحة الاستوديو العائمة بتصميم زجاجي كربوني كحلي فخم
         suitePanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             visibility = View.GONE
@@ -218,8 +232,8 @@ class OverlayService : Service() {
             background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
                 cornerRadius = 24 * density
-                setColor(Color.parseColor("#F20B0F19")) // زجاج كحلي مظلم شبه شفاف
-                setStroke((1.2f * density).toInt(), Color.parseColor("#4DFFD700")) // حافة زجاجية مشطوفة
+                setColor(Color.parseColor("#F20B0F19"))
+                setStroke((1.2f * density).toInt(), Color.parseColor("#4DFFD700"))
             }
             layoutParams = FrameLayout.LayoutParams((345 * density).toInt(), FrameLayout.LayoutParams.WRAP_CONTENT)
         }
@@ -273,10 +287,10 @@ class OverlayService : Service() {
 
     fun renderMainJobsView() {
         setKeyboardFocusable(false)
+        setPanelDimensions(false)
         suitePanel.removeAllViews()
         val density = resources.displayMetrics.density
 
-        // شريط الأزرار العلوية المصنوعة ككبسولات زجاجية
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -307,16 +321,11 @@ class OverlayService : Service() {
             }
         }
 
-        val btnAddEmptyStep = makeGlassActionIcon("➕") { addEmptyCustomStep() }
-        val btnTopLibrary = makeGlassActionIcon("📁") { showInAppTargetPicker() }
-        val btnGlobalSettings = makeGlassActionIcon("⚙️") { showGlobalJobSettingsDialog() }
-        val btnClose = makeGlassActionIcon("✕") { togglePanelExpansion(false) }
-
         header.addView(title)
-        header.addView(btnAddEmptyStep)
-        header.addView(btnTopLibrary)
-        header.addView(btnGlobalSettings)
-        header.addView(btnClose)
+        header.addView(makeGlassActionIcon("➕") { addEmptyCustomStep() })
+        header.addView(makeGlassActionIcon("📁") { showInAppTargetPicker() })
+        header.addView(makeGlassActionIcon("⚙️") { showGlobalJobSettingsDialog() })
+        header.addView(makeGlassActionIcon("✕") { togglePanelExpansion(false) })
         suitePanel.addView(header)
 
         val scrollView = ScrollView(this).apply {
@@ -336,7 +345,7 @@ class OverlayService : Service() {
                 setPadding((12 * density).toInt(), (10 * density).toInt(), (12 * density).toInt(), (10 * density).toInt())
                 background = GradientDrawable().apply {
                     cornerRadius = 16 * density
-                    setColor(Color.parseColor("#14FFFFFF")) // زجاج مصنفر
+                    setColor(Color.parseColor("#14FFFFFF"))
                     setStroke(1, Color.parseColor("#26FFFFFF"))
                 }
                 layoutParams = LinearLayout.LayoutParams(
@@ -486,7 +495,6 @@ class OverlayService : Service() {
         scrollView.addView(cardsContainer)
         suitePanel.addView(scrollView)
 
-        // الأزرار السفلية الزجاجية
         val buttonsRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = LinearLayout.LayoutParams(
@@ -566,7 +574,7 @@ class OverlayService : Service() {
             name = "Script Step $nextNum",
             type = ActionType.JS_SCRIPT,
             thumbnail = null,
-            customScript = "",
+            customScript = "", // فارغ كلياً
             delayAfterMs = 300L
         )
         stepsList.add(newStep)
@@ -574,7 +582,6 @@ class OverlayService : Service() {
         openJsEditor(stepsList.size - 1)
     }
 
-    // نافذة اختيار هدف من المستودع بتصميم زجاجي فاخر
     private fun showInAppTargetPicker() {
         val targets = ImageLibrary.targetImages
         if (targets.isEmpty()) {
@@ -907,9 +914,10 @@ class OverlayService : Service() {
         suitePanel.addView(btnSave)
     }
 
-    // محرر الكود الزجاجي مع كبسولات الأوامر السريعة
+    // 🌟 محرر الكود الموسع والمطور مع أدوات الحافظة والنسخ واللصق
     private fun openJsEditor(index: Int) {
         setKeyboardFocusable(true)
+        setPanelDimensions(true) // تكبير النافذة لتصبح احترافية وأوسع
         suitePanel.removeAllViews()
         val density = resources.displayMetrics.density
         val step = stepsList[index]
@@ -938,23 +946,93 @@ class OverlayService : Service() {
         header.addView(title)
         suitePanel.addView(header)
 
+        // مساحة كتابة الكود بتصميم واسع وارتفاع 240dp مع تفعيل كامل للضغط المطول والتحديد
         val editCode = EditText(this).apply {
             setText(step.customScript)
             setTextColor(Color.parseColor("#38BDF8"))
             background = GradientDrawable().apply {
                 cornerRadius = 16 * density
-                setColor(Color.parseColor("#FA070A12"))
-                setStroke(1, Color.parseColor("#1FFFFFFF"))
+                setColor(Color.parseColor("#FA060910"))
+                setStroke(1, Color.parseColor("#26FFFFFF"))
             }
-            setPadding(16, 16, 16, 16)
-            textSize = 12f
+            setPadding((14 * density).toInt(), (14 * density).toInt(), (14 * density).toInt(), (14 * density).toInt())
+            textSize = 13f
             typeface = Typeface.MONOSPACE
+            gravity = Gravity.TOP or Gravity.START
+            isFocusable = true
+            isFocusableInTouchMode = true
+            isLongClickable = true
+            setTextIsSelectable(true) // دعم الضغط المطول والنظام
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                (140 * density).toInt()
+                (240 * density).toInt() // مساحة واسعة ومريحة
             )
             addTextChangedListener(CodeSyntaxHighlighter())
         }
+
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+
+        // شريط أدوات الحافظة السريعة (نسخ، لصق، تحديد الكل، مسح)
+        val editActionsBar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (34 * density).toInt()
+            ).apply { bottomMargin = (6 * density).toInt() }
+        }
+
+        fun makeEditToolBtn(label: String, onClick: () -> Unit): TextView {
+            return TextView(this).apply {
+                text = label
+                textSize = 11f
+                gravity = Gravity.CENTER
+                setTextColor(Color.parseColor("#F1F5F9"))
+                background = GradientDrawable().apply {
+                    cornerRadius = 8 * density
+                    setColor(Color.parseColor("#1FFFFFFF"))
+                    setStroke(1, Color.parseColor("#26FFFFFF"))
+                }
+                layoutParams = LinearLayout.LayoutParams(0, (28 * density).toInt(), 1f).apply {
+                    marginEnd = (4 * density).toInt()
+                }
+                setOnClickListener { onClick() }
+            }
+        }
+
+        editActionsBar.addView(makeEditToolBtn("📋 لصق") {
+            val clip = clipboard.primaryClip
+            if (clip != null && clip.itemCount > 0) {
+                val pasteText = clip.getItemAt(0).text?.toString() ?: ""
+                val start = max(0, editCode.selectionStart)
+                val end = max(0, editCode.selectionEnd)
+                editCode.text.replace(min(start, end), max(start, end), pasteText)
+            }
+        })
+
+        editActionsBar.addView(makeEditToolBtn("📑 نسخ") {
+            val start = editCode.selectionStart
+            val end = editCode.selectionEnd
+            val selectedText = if (start != end) {
+                editCode.text.substring(min(start, end), max(start, end))
+            } else {
+                editCode.text.toString()
+            }
+            if (selectedText.isNotEmpty()) {
+                clipboard.setPrimaryClip(ClipData.newPlainText("ApexCode", selectedText))
+                Toast.makeText(this@OverlayService, "تم النسخ إلى الحافظة!", Toast.LENGTH_SHORT).show()
+            }
+        })
+
+        editActionsBar.addView(makeEditToolBtn("🔲 تحديد الكل") {
+            editCode.selectAll()
+        })
+
+        editActionsBar.addView(makeEditToolBtn("⌫ مسح") {
+            editCode.setText("")
+        })
+
+        suitePanel.addView(editActionsBar)
 
         fun insertSnippet(snippet: String) {
             val start = max(0, editCode.selectionStart)
@@ -962,10 +1040,11 @@ class OverlayService : Service() {
             editCode.text.replace(min(start, end), max(start, end), snippet)
         }
 
+        // شريط الأوامر السريعة المساعد
         val toolbarScroll = HorizontalScrollView(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                (38 * density).toInt()
+                (36 * density).toInt()
             ).apply { bottomMargin = (8 * density).toInt() }
             isVerticalScrollBarEnabled = false
         }
@@ -974,7 +1053,7 @@ class OverlayService : Service() {
         fun makeSnippetBtn(label: String, code: String): Button {
             return Button(this).apply {
                 text = label
-                textSize = 11f
+                textSize = 10.5f
                 setTextColor(Color.parseColor("#FFD700"))
                 stateListAnimator = null
                 background = GradientDrawable().apply {
@@ -985,22 +1064,27 @@ class OverlayService : Service() {
                 setPadding((12 * density).toInt(), 0, (12 * density).toInt(), 0)
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
-                    (30 * density).toInt()
+                    (28 * density).toInt()
                 ).apply { marginEnd = (6 * density).toInt() }
                 setOnClickListener { insertSnippet(code) }
             }
         }
 
-        toolbarContainer.addView(makeSnippetBtn("👆 clickImage", "clickImage(\"${step.targetImageName}\");\n"))
-        toolbarContainer.addView(makeSnippetBtn("👁️ findImage", "if (findImage(\"${step.targetImageName}\", 70).found) {\n    click(x, y);\n}\n"))
+        toolbarContainer.addView(makeSnippetBtn("👆 click", "click(x, y);\n"))
+        toolbarContainer.addView(makeSnippetBtn("👆 clickImage", "clickImage(\"${step.targetImageName}\", 70);\n"))
+        toolbarContainer.addView(makeSnippetBtn("👁️ findImage", "let res = findImage(\"${step.targetImageName}\", 70);\nif (res.found) {\n    click(res.x, res.y);\n}\n"))
         toolbarContainer.addView(makeSnippetBtn("⏱️ sleep", "sleep(500);\n"))
-        toolbarContainer.addView(makeSnippetBtn("💬 toast", "toast(\"تم العثور على الهدف!\");\n"))
+        toolbarContainer.addView(makeSnippetBtn("↔️ swipe", "swipe(x, y, x, y - 400, 300);\n"))
+        toolbarContainer.addView(makeSnippetBtn("⏳ longClick", "longClick(x, y, 800);\n"))
+        toolbarContainer.addView(makeSnippetBtn("🎲 random", "let r = random(200, 500);\nsleep(r);\n"))
+        toolbarContainer.addView(makeSnippetBtn("💬 toast", "toast(\"تم التنفيذ بنجاح!\");\n"))
         toolbarContainer.addView(makeSnippetBtn("🔙 Back", "pressBack();\n"))
         toolbarContainer.addView(makeSnippetBtn("🏠 Home", "pressHome();\n"))
+        toolbarContainer.addView(makeSnippetBtn("📑 Recent", "pressRecent();\n"))
 
         val btnPickTargetName = Button(this).apply {
-            text = "📁 اسم صورة"
-            textSize = 11f
+            text = "📁 اسم هدف"
+            textSize = 10.5f
             setTextColor(Color.WHITE)
             stateListAnimator = null
             background = GradientDrawable().apply {
@@ -1011,7 +1095,7 @@ class OverlayService : Service() {
             setPadding((12 * density).toInt(), 0, (12 * density).toInt(), 0)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
-                (30 * density).toInt()
+                (28 * density).toInt()
             )
             setOnClickListener {
                 val targets = ImageLibrary.targetImages.keys.toList()
@@ -1026,6 +1110,8 @@ class OverlayService : Service() {
 
         toolbarScroll.addView(toolbarContainer)
         suitePanel.addView(toolbarScroll)
+
+        // إضافة صندوق الكود
         suitePanel.addView(editCode)
 
         val btnSave = Button(this).apply {
