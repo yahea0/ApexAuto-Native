@@ -29,6 +29,6 @@ data class MacroStep(
     var repeatCount: Int = 1,
     var delayBeforeMs: Long = 0L,
     var delayAfterMs: Long = 500L,
-    var customScript: String = "// كود JavaScript مخصص\nclick(x, y);\nsleep(300);",
+    var customScript: String = "", // فارغ تماماً لتبدأ كتابة خطواتك بنفسك
     var enabled: Boolean = true
 )
