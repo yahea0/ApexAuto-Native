@@ -18,6 +18,7 @@ class ScriptRunner {
     private val mainHandler = Handler(Looper.getMainLooper())
 
     fun execute(code: String, stepNum: Int, targetX: Float, targetY: Float): Boolean {
+        if (code.isBlank()) return true
         return try {
             val cx = Context.enter()
             cx.optimizationLevel = -1
@@ -26,8 +27,10 @@ class ScriptRunner {
             ScriptableObject.putProperty(scope, "step", stepNum)
             ScriptableObject.putProperty(scope, "x", targetX)
             ScriptableObject.putProperty(scope, "y", targetY)
+            ScriptableObject.putProperty(scope, "screenWidth", ScreenCaptureManager.screenWidth)
+            ScriptableObject.putProperty(scope, "screenHeight", ScreenCaptureManager.screenHeight)
 
-            // 1. دالة النقر بالإحداثيات: click(x, y)
+            // 1. النقر السريع click(x, y) أو tap(x, y)
             val clickFunc = object : BaseFunction() {
                 override fun call(cx: Context?, scope: Scriptable?, thisObj: Scriptable?, args: Array<out Any>?): Any {
                     if (args != null && args.size >= 2) {
@@ -39,8 +42,39 @@ class ScriptRunner {
                 }
             }
             ScriptableObject.putProperty(scope, "click", clickFunc)
+            ScriptableObject.putProperty(scope, "tap", clickFunc)
 
-            // 2. دالة البحث عن صورة: findImage("target_name", 70)
+            // 2. الضغط المطول longClick(x, y, duration)
+            val longClickFunc = object : BaseFunction() {
+                override fun call(cx: Context?, scope: Scriptable?, thisObj: Scriptable?, args: Array<out Any>?): Any {
+                    if (args != null && args.size >= 2) {
+                        val px = Context.toNumber(args[0]).toFloat()
+                        val py = Context.toNumber(args[1]).toFloat()
+                        val duration = if (args.size >= 3) Context.toNumber(args[2]).toLong() else 800L
+                        ApexAccessibilityService.instance?.performLongClick(px, py, duration)
+                    }
+                    return Context.getUndefinedValue()
+                }
+            }
+            ScriptableObject.putProperty(scope, "longClick", longClickFunc)
+
+            // 3. السحب swipe(x1, y1, x2, y2, duration)
+            val swipeFunc = object : BaseFunction() {
+                override fun call(cx: Context?, scope: Scriptable?, thisObj: Scriptable?, args: Array<out Any>?): Any {
+                    if (args != null && args.size >= 4) {
+                        val x1 = Context.toNumber(args[0]).toFloat()
+                        val y1 = Context.toNumber(args[1]).toFloat()
+                        val x2 = Context.toNumber(args[2]).toFloat()
+                        val y2 = Context.toNumber(args[3]).toFloat()
+                        val duration = if (args.size >= 5) Context.toNumber(args[4]).toLong() else 300L
+                        ApexAccessibilityService.instance?.performSwipe(x1, y1, x2, y2, duration)
+                    }
+                    return Context.getUndefinedValue()
+                }
+            }
+            ScriptableObject.putProperty(scope, "swipe", swipeFunc)
+
+            // 4. دالة البحث عن صورة: findImage("name", threshold)
             val findImageFunc = object : BaseFunction() {
                 override fun call(cx: Context?, scope: Scriptable?, thisObj: Scriptable?, args: Array<out Any>?): Any {
                     val name = args?.getOrNull(0)?.toString() ?: ""
@@ -48,7 +82,6 @@ class ScriptRunner {
 
                     val bmp = ImageLibrary.getTarget(name)
                     val screen = ScreenCaptureManager.getRealScreenshot()
-
                     val resultObj = cx?.newObject(scope) ?: return Context.getUndefinedValue()
 
                     if (bmp != null && screen != null) {
@@ -74,7 +107,7 @@ class ScriptRunner {
             }
             ScriptableObject.putProperty(scope, "findImage", findImageFunc)
 
-            // 3. دالة النقر المباشر على صورة إذا وُجدت: clickImage("target_name", 70)
+            // 5. دالة النقر على صورة: clickImage("name", threshold)
             val clickImageFunc = object : BaseFunction() {
                 override fun call(cx: Context?, scope: Scriptable?, thisObj: Scriptable?, args: Array<out Any>?): Any {
                     val name = args?.getOrNull(0)?.toString() ?: ""
@@ -101,7 +134,7 @@ class ScriptRunner {
             }
             ScriptableObject.putProperty(scope, "clickImage", clickImageFunc)
 
-            // 4. دالة الانتظار: sleep(ms)
+            // 6. الانتظار sleep(ms)
             val sleepFunc = object : BaseFunction() {
                 override fun call(cx: Context?, scope: Scriptable?, thisObj: Scriptable?, args: Array<out Any>?): Any {
                     if (args != null && args.isNotEmpty()) {
@@ -113,7 +146,17 @@ class ScriptRunner {
             }
             ScriptableObject.putProperty(scope, "sleep", sleepFunc)
 
-            // 5. دالة إظهار إشعار: toast("text")
+            // 7. دالة التوليد العشوائي random(min, max)
+            val randomFunc = object : BaseFunction() {
+                override fun call(cx: Context?, scope: Scriptable?, thisObj: Scriptable?, args: Array<out Any>?): Any {
+                    val min = if (args != null && args.isNotEmpty()) Context.toNumber(args[0]).toInt() else 0
+                    val max = if (args != null && args.size >= 2) Context.toNumber(args[1]).toInt() else 100
+                    return (min..max).random()
+                }
+            }
+            ScriptableObject.putProperty(scope, "random", randomFunc)
+
+            // 8. إشعارات والطباعة: toast & log
             val toastFunc = object : BaseFunction() {
                 override fun call(cx: Context?, scope: Scriptable?, thisObj: Scriptable?, args: Array<out Any>?): Any {
                     val msg = args?.getOrNull(0)?.toString() ?: ""
@@ -127,22 +170,34 @@ class ScriptRunner {
             }
             ScriptableObject.putProperty(scope, "toast", toastFunc)
 
-            // 6. أزرار النظام: pressBack() و pressHome()
-            val backFunc = object : BaseFunction() {
+            val logFunc = object : BaseFunction() {
+                override fun call(cx: Context?, scope: Scriptable?, thisObj: Scriptable?, args: Array<out Any>?): Any {
+                    val msg = args?.getOrNull(0)?.toString() ?: ""
+                    Log.i("Apex_JS_User", msg)
+                    return Context.getUndefinedValue()
+                }
+            }
+            ScriptableObject.putProperty(scope, "log", logFunc)
+
+            // 9. أزرار النظام: رجوع، رئيسية، والتطبيقات المفتوحة
+            ScriptableObject.putProperty(scope, "pressBack", object : BaseFunction() {
                 override fun call(cx: Context?, scope: Scriptable?, thisObj: Scriptable?, args: Array<out Any>?): Any {
                     ApexAccessibilityService.instance?.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
                     return Context.getUndefinedValue()
                 }
-            }
-            ScriptableObject.putProperty(scope, "pressBack", backFunc)
-
-            val homeFunc = object : BaseFunction() {
+            })
+            ScriptableObject.putProperty(scope, "pressHome", object : BaseFunction() {
                 override fun call(cx: Context?, scope: Scriptable?, thisObj: Scriptable?, args: Array<out Any>?): Any {
                     ApexAccessibilityService.instance?.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME)
                     return Context.getUndefinedValue()
                 }
-            }
-            ScriptableObject.putProperty(scope, "pressHome", homeFunc)
+            })
+            ScriptableObject.putProperty(scope, "pressRecent", object : BaseFunction() {
+                override fun call(cx: Context?, scope: Scriptable?, thisObj: Scriptable?, args: Array<out Any>?): Any {
+                    ApexAccessibilityService.instance?.performGlobalAction(AccessibilityService.GLOBAL_ACTION_RECENTS)
+                    return Context.getUndefinedValue()
+                }
+            })
 
             cx.evaluateString(scope, code, "UserMacroScript", 1, null)
             Context.exit()
