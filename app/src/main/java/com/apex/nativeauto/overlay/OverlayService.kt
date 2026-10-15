@@ -20,7 +20,6 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
-import android.view.inputmethod.InputMethodManager
 import android.widget.*
 import androidx.core.app.NotificationCompat
 import com.apex.nativeauto.accessibility.ApexAccessibilityService
@@ -75,7 +74,6 @@ class OverlayService : Service() {
             }
         }
 
-        // تحديث الاسم فورياً في كل الخطوات عند تغييره من المستودع
         fun notifyTargetRenamed(oldName: String, newName: String) {
             instance?.let { service ->
                 service.mainHandler.post {
@@ -103,7 +101,7 @@ class OverlayService : Service() {
 
     private var isRunningLoop = false
     private var isAttached = false
-    private var loopCountLimit = 0 // 0 = تكرار لا نهائي
+    private var loopCountLimit = 0
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -198,33 +196,31 @@ class OverlayService : Service() {
         rootContainer = FrameLayout(this)
         val density = resources.displayMetrics.density
 
-        // الزر العائم الملكي الذهبي (48dp)
+        // الفقاعة العائمة الملكية - زجاج مصنفر خفيف بتوهج ذهبي
         bubbleView = TextView(this).apply {
             text = "⚡"
-            textSize = 20f
+            textSize = 21f
             gravity = Gravity.CENTER
             setTextColor(Color.parseColor("#FFD700"))
-            val bg = GradientDrawable().apply {
+            background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(Color.parseColor("#0B0C10"))
-                setStroke((2.5f * density).toInt(), Color.parseColor("#FFD700"))
+                setColor(Color.parseColor("#E60D121F"))
+                setStroke((1.5f * density).toInt(), Color.parseColor("#80FFD700"))
             }
-            background = bg
-            layoutParams = FrameLayout.LayoutParams((48 * density).toInt(), (48 * density).toInt())
+            layoutParams = FrameLayout.LayoutParams((50 * density).toInt(), (50 * density).toInt())
         }
 
-        // الجناح الموسع بتصميم أسود ملكي فخم
+        // لوحة الاستوديو العائمة بتصميم زجاجي كربوني كحلي فخم
         suitePanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             visibility = View.GONE
-            setPadding((14 * density).toInt(), (14 * density).toInt(), (14 * density).toInt(), (14 * density).toInt())
-            val bg = GradientDrawable().apply {
+            setPadding((16 * density).toInt(), (16 * density).toInt(), (16 * density).toInt(), (16 * density).toInt())
+            background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
                 cornerRadius = 24 * density
-                setColor(Color.parseColor("#F50D0E15"))
-                setStroke((2f * density).toInt(), Color.parseColor("#D4AF37"))
+                setColor(Color.parseColor("#F20B0F19")) // زجاج كحلي مظلم شبه شفاف
+                setStroke((1.2f * density).toInt(), Color.parseColor("#4DFFD700")) // حافة زجاجية مشطوفة
             }
-            background = bg
             layoutParams = FrameLayout.LayoutParams((345 * density).toInt(), FrameLayout.LayoutParams.WRAP_CONTENT)
         }
 
@@ -280,10 +276,11 @@ class OverlayService : Service() {
         suitePanel.removeAllViews()
         val density = resources.displayMetrics.density
 
-        // الشريط العلوي الملكي مع الأدوات المتقدمة في الزاوية اليمنى (الصورة 3)
+        // شريط الأزرار العلوية المصنوعة ككبسولات زجاجية
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, 0, 0, (10 * density).toInt())
         }
         val title = TextView(this).apply {
             text = "⚡ APEX ROYAL STUDIO"
@@ -293,37 +290,27 @@ class OverlayService : Service() {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
 
-        // 1. زر إضافة خطوة برمجية فارغة وجديدة (+)
-        val btnAddEmptyStep = TextView(this).apply {
-            text = " ➕ "
-            textSize = 15f
-            setTextColor(Color.parseColor("#FFD700"))
-            setOnClickListener { addEmptyCustomStep() }
+        fun makeGlassActionIcon(symbol: String, onClick: () -> Unit): TextView {
+            return TextView(this).apply {
+                text = symbol
+                textSize = 13f
+                gravity = Gravity.CENTER
+                setTextColor(Color.parseColor("#F1F5F9"))
+                background = GradientDrawable().apply {
+                    cornerRadius = 14 * density
+                    setColor(Color.parseColor("#1FFFFFFF"))
+                    setStroke(1, Color.parseColor("#33FFFFFF"))
+                }
+                val s = (28 * density).toInt()
+                layoutParams = LinearLayout.LayoutParams(s, s).apply { marginEnd = (6 * density).toInt() }
+                setOnClickListener { onClick() }
+            }
         }
 
-        // 2. زر فتح المستودع من الشريط العلوي (📁)
-        val btnTopLibrary = TextView(this).apply {
-            text = " 📁 "
-            textSize = 15f
-            setTextColor(Color.parseColor("#FFD700"))
-            setOnClickListener { showInAppTargetPicker() }
-        }
-
-        // 3. زر إعدادات التشغيل العامة (⚙️)
-        val btnGlobalSettings = TextView(this).apply {
-            text = " ⚙️ "
-            textSize = 14f
-            setTextColor(Color.parseColor("#FFD700"))
-            setOnClickListener { showGlobalJobSettingsDialog() }
-        }
-
-        val btnClose = TextView(this).apply {
-            text = " ✕"
-            setTextColor(Color.parseColor("#D4AF37"))
-            textSize = 17f
-            setPadding((6 * density).toInt(), 0, (2 * density).toInt(), 0)
-            setOnClickListener { togglePanelExpansion(false) }
-        }
+        val btnAddEmptyStep = makeGlassActionIcon("➕") { addEmptyCustomStep() }
+        val btnTopLibrary = makeGlassActionIcon("📁") { showInAppTargetPicker() }
+        val btnGlobalSettings = makeGlassActionIcon("⚙️") { showGlobalJobSettingsDialog() }
+        val btnClose = makeGlassActionIcon("✕") { togglePanelExpansion(false) }
 
         header.addView(title)
         header.addView(btnAddEmptyStep)
@@ -336,7 +323,8 @@ class OverlayService : Service() {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 (250 * density).toInt()
-            ).apply { topMargin = (8 * density).toInt(); bottomMargin = (8 * density).toInt() }
+            ).apply { topMargin = (6 * density).toInt(); bottomMargin = (8 * density).toInt() }
+            isVerticalScrollBarEnabled = false
         }
 
         val cardsContainer = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
@@ -346,12 +334,11 @@ class OverlayService : Service() {
                 orientation = LinearLayout.VERTICAL
                 layoutDirection = View.LAYOUT_DIRECTION_LTR
                 setPadding((12 * density).toInt(), (10 * density).toInt(), (12 * density).toInt(), (10 * density).toInt())
-                val cBg = GradientDrawable().apply {
+                background = GradientDrawable().apply {
                     cornerRadius = 16 * density
-                    setColor(Color.parseColor("#151722"))
-                    setStroke(1, Color.parseColor("#D4AF37"))
+                    setColor(Color.parseColor("#14FFFFFF")) // زجاج مصنفر
+                    setStroke(1, Color.parseColor("#26FFFFFF"))
                 }
-                background = cBg
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
@@ -379,15 +366,14 @@ class OverlayService : Service() {
                 textSize = 11f
                 gravity = Gravity.CENTER
                 typeface = Typeface.DEFAULT_BOLD
-                setTextColor(Color.parseColor("#FFD700"))
-                val bBg = GradientDrawable().apply {
+                setTextColor(Color.parseColor("#38BDF8"))
+                background = GradientDrawable().apply {
                     cornerRadius = 8 * density
-                    setColor(Color.parseColor("#1F222E"))
-                    setStroke(1, Color.parseColor("#D4AF37"))
+                    setColor(Color.parseColor("#1A38BDF8"))
+                    setStroke(1, Color.parseColor("#4D38BDF8"))
                 }
-                background = bBg
                 val w = (42 * density).toInt()
-                val h = (28 * density).toInt()
+                val h = (26 * density).toInt()
                 layoutParams = LinearLayout.LayoutParams(w, h).apply { marginEnd = (6 * density).toInt() }
                 setOnClickListener { openJsEditor(index) }
             }
@@ -398,28 +384,27 @@ class OverlayService : Service() {
                 gravity = Gravity.CENTER
                 typeface = Typeface.DEFAULT_BOLD
                 setTextColor(Color.parseColor("#0B0C10"))
-                val bg = GradientDrawable().apply {
+                background = GradientDrawable().apply {
                     cornerRadius = 8 * density
                     setColor(Color.parseColor("#FFD700"))
                 }
-                background = bg
-                val w = (68 * density).toInt()
-                val h = (28 * density).toInt()
+                val w = (66 * density).toInt()
+                val h = (26 * density).toInt()
                 layoutParams = LinearLayout.LayoutParams(w, h).apply { marginEnd = (6 * density).toInt() }
                 setOnClickListener { testSingleActionWithAutoPeek(step) }
             }
 
             val btnUp = TextView(this).apply {
                 text = "▲"
-                setTextColor(Color.parseColor("#D4AF37"))
-                textSize = 14f
+                setTextColor(Color.parseColor("#94A3B8"))
+                textSize = 13f
                 setPadding((5 * density).toInt(), 0, (3 * density).toInt(), 0)
                 setOnClickListener { moveStep(index, -1) }
             }
             val btnDown = TextView(this).apply {
                 text = "▼"
-                setTextColor(Color.parseColor("#D4AF37"))
-                textSize = 14f
+                setTextColor(Color.parseColor("#94A3B8"))
+                textSize = 13f
                 setPadding((3 * density).toInt(), 0, (5 * density).toInt(), 0)
                 setOnClickListener { moveStep(index, 1) }
             }
@@ -441,7 +426,6 @@ class OverlayService : Service() {
             topBar.addView(btnDown)
             topBar.addView(btnDel)
 
-            // سطر التحكم بالنقر والسرعة
             val rowClick = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
@@ -454,12 +438,11 @@ class OverlayService : Service() {
                 val thumb = ImageView(this).apply {
                     setImageBitmap(step.thumbnail)
                     scaleType = ImageView.ScaleType.FIT_CENTER
-                    val tBg = GradientDrawable().apply {
+                    background = GradientDrawable().apply {
                         cornerRadius = 6 * density
                         setColor(Color.BLACK)
-                        setStroke(1, Color.parseColor("#FFD700"))
+                        setStroke(1, Color.parseColor("#4DFFD700"))
                     }
-                    background = tBg
                     val s = (36 * density).toInt()
                     layoutParams = LinearLayout.LayoutParams(s, s).apply { marginEnd = (8 * density).toInt() }
                 }
@@ -474,7 +457,6 @@ class OverlayService : Service() {
             }
             rowClick.addView(txtClick)
 
-            // سطر الفرع
             val rowBranch = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
@@ -490,7 +472,7 @@ class OverlayService : Service() {
                     DetectScope.FULL_SCREEN -> "Full Screen"
                 }
                 text = if (step.thumbnail != null) "└ Image [Appear] [${step.similarityPercent}%] [$scopeName] ⚙" else "└ Code Action (مخصص) ⚙"
-                setTextColor(Color.parseColor("#A0A5B5"))
+                setTextColor(Color.parseColor("#94A3B8"))
                 textSize = 10f
             }
             rowBranch.addView(txtBranch)
@@ -504,27 +486,27 @@ class OverlayService : Service() {
         scrollView.addView(cardsContainer)
         suitePanel.addView(scrollView)
 
-        // الأزرار السفلية
+        // الأزرار السفلية الزجاجية
         val buttonsRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = (4 * density).toInt() }
+            ).apply { topMargin = (6 * density).toInt() }
         }
 
         val btnPickFromLibrary = Button(this).apply {
             text = "📁 من المستودع"
             setTextColor(Color.parseColor("#0B0C10"))
-            textSize = 11f
+            textSize = 12f
             typeface = Typeface.DEFAULT_BOLD
-            val bg = GradientDrawable().apply {
-                cornerRadius = 12 * density
+            stateListAnimator = null
+            background = GradientDrawable().apply {
+                cornerRadius = 14 * density
                 setColor(Color.parseColor("#FFD700"))
             }
-            background = bg
             layoutParams = LinearLayout.LayoutParams(0, (44 * density).toInt(), 1f).apply {
-                marginEnd = (4 * density).toInt()
+                marginEnd = (5 * density).toInt()
             }
             setOnClickListener { showInAppTargetPicker() }
         }
@@ -532,16 +514,16 @@ class OverlayService : Service() {
         val btnGalleryAction = Button(this).apply {
             text = "🖼️ من المعرض"
             setTextColor(Color.WHITE)
-            textSize = 11f
+            textSize = 12f
             typeface = Typeface.DEFAULT_BOLD
-            val bg = GradientDrawable().apply {
-                cornerRadius = 12 * density
-                setColor(Color.parseColor("#1F222E"))
-                setStroke(1, Color.parseColor("#D4AF37"))
+            stateListAnimator = null
+            background = GradientDrawable().apply {
+                cornerRadius = 14 * density
+                setColor(Color.parseColor("#1AFFFFFF"))
+                setStroke(1, Color.parseColor("#33FFFFFF"))
             }
-            background = bg
             layoutParams = LinearLayout.LayoutParams(0, (44 * density).toInt(), 1f).apply {
-                marginStart = (4 * density).toInt()
+                marginStart = (5 * density).toInt()
             }
             setOnClickListener {
                 val intent = Intent(this@OverlayService, TransparentPickerActivity::class.java).apply {
@@ -557,18 +539,18 @@ class OverlayService : Service() {
 
         val btnRunJob = Button(this).apply {
             text = if (isRunningLoop) "⏹ Stop Job" else "▶ Run Job"
-            setTextColor(Color.WHITE)
+            setTextColor(if (isRunningLoop) Color.WHITE else Color.parseColor("#042614"))
             typeface = Typeface.DEFAULT_BOLD
-            textSize = 13f
-            val bg = GradientDrawable().apply {
-                cornerRadius = 14 * density
-                setColor(if (isRunningLoop) Color.parseColor("#EF4444") else Color.parseColor("#10B981"))
+            textSize = 14f
+            stateListAnimator = null
+            background = GradientDrawable().apply {
+                cornerRadius = 16 * density
+                setColor(if (isRunningLoop) Color.parseColor("#EF4444") else Color.parseColor("#00E676"))
             }
-            background = bg
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                (44 * density).toInt()
-            ).apply { topMargin = (6 * density).toInt() }
+                (46 * density).toInt()
+            ).apply { topMargin = (8 * density).toInt() }
             setOnClickListener {
                 if (isRunningLoop) stopExecution() else startExecution()
                 renderMainJobsView()
@@ -577,7 +559,6 @@ class OverlayService : Service() {
         suitePanel.addView(btnRunJob)
     }
 
-    // إضافة خطوة برمجية فارغة تماماً دون أي كود مفروض (الطلب 1)
     private fun addEmptyCustomStep() {
         val nextNum = stepsList.size + 1
         val newStep = MacroStep(
@@ -585,7 +566,7 @@ class OverlayService : Service() {
             name = "Script Step $nextNum",
             type = ActionType.JS_SCRIPT,
             thumbnail = null,
-            customScript = "", // فارغ تماماً لتكتب ما تريد بكيفك
+            customScript = "",
             delayAfterMs = 300L
         )
         stepsList.add(newStep)
@@ -593,7 +574,7 @@ class OverlayService : Service() {
         openJsEditor(stepsList.size - 1)
     }
 
-    // نافذة اختيار هدف من المستودع بلمسة واحدة دون مغادرة اللعبة
+    // نافذة اختيار هدف من المستودع بتصميم زجاجي فاخر
     private fun showInAppTargetPicker() {
         val targets = ImageLibrary.targetImages
         if (targets.isEmpty()) {
@@ -607,18 +588,19 @@ class OverlayService : Service() {
         val title = TextView(this).apply {
             text = "اختر هدفاً من المستودع"
             setTextColor(Color.parseColor("#FFD700"))
-            textSize = 14f
+            textSize = 15f
             typeface = Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
-            setPadding(0, 0, 0, (8 * density).toInt())
+            setPadding(0, 0, 0, (12 * density).toInt())
         }
         suitePanel.addView(title)
 
         val scroll = ScrollView(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                (200 * density).toInt()
+                (210 * density).toInt()
             )
+            isVerticalScrollBarEnabled = false
         }
         val container = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
 
@@ -626,17 +608,16 @@ class OverlayService : Service() {
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
-                setPadding((8 * density).toInt(), (6 * density).toInt(), (8 * density).toInt(), (6 * density).toInt())
-                val bg = GradientDrawable().apply {
-                    cornerRadius = 8 * density
-                    setColor(Color.parseColor("#151722"))
-                    setStroke(1, Color.parseColor("#D4AF37"))
+                setPadding((10 * density).toInt(), (8 * density).toInt(), (10 * density).toInt(), (8 * density).toInt())
+                background = GradientDrawable().apply {
+                    cornerRadius = 14 * density
+                    setColor(Color.parseColor("#14FFFFFF"))
+                    setStroke(1, Color.parseColor("#26FFFFFF"))
                 }
-                background = bg
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { topMargin = (4 * density).toInt() }
+                ).apply { topMargin = (6 * density).toInt() }
                 setOnClickListener {
                     addGalleryTarget(bmp)
                 }
@@ -645,14 +626,15 @@ class OverlayService : Service() {
             val img = ImageView(this).apply {
                 setImageBitmap(bmp)
                 scaleType = ImageView.ScaleType.FIT_CENTER
-                layoutParams = LinearLayout.LayoutParams((32 * density).toInt(), (32 * density).toInt()).apply {
-                    marginEnd = (8 * density).toInt()
+                layoutParams = LinearLayout.LayoutParams((36 * density).toInt(), (36 * density).toInt()).apply {
+                    marginEnd = (10 * density).toInt()
                 }
             }
             val txt = TextView(this).apply {
                 text = name
                 setTextColor(Color.WHITE)
-                textSize = 12f
+                textSize = 13f
+                typeface = Typeface.DEFAULT_BOLD
             }
             row.addView(img)
             row.addView(txt)
@@ -664,14 +646,23 @@ class OverlayService : Service() {
 
         val btnBack = Button(this).apply {
             text = "إلغاء"
-            setTextColor(Color.WHITE)
-            setBackgroundColor(Color.parseColor("#1F222E"))
+            setTextColor(Color.parseColor("#94A3B8"))
+            textSize = 12f
+            stateListAnimator = null
+            background = GradientDrawable().apply {
+                cornerRadius = 14 * density
+                setColor(Color.parseColor("#14FFFFFF"))
+                setStroke(1, Color.parseColor("#1FFFFFFF"))
+            }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (42 * density).toInt()
+            ).apply { topMargin = (10 * density).toInt() }
             setOnClickListener { renderMainJobsView() }
         }
         suitePanel.addView(btnBack)
     }
 
-    // إعدادات الأكشن والسرعة وتدريب الذكاء الاصطناعي
     fun showActionSettingsDialog(index: Int) {
         setKeyboardFocusable(true)
         val step = stepsList[index]
@@ -681,55 +672,56 @@ class OverlayService : Service() {
         val title = TextView(this).apply {
             text = "إعدادات الأكشن والسرعة"
             setTextColor(Color.parseColor("#FFD700"))
-            textSize = 14f
+            textSize = 15f
             typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, (10 * density).toInt())
         }
         suitePanel.addView(title)
 
-        val editName = EditText(this).apply {
-            hint = "اسم الأكشن"
-            setText(step.name)
-            setTextColor(Color.WHITE)
-            setBackgroundColor(Color.parseColor("#151722"))
-            setPadding(16, 12, 16, 12)
+        fun makeGlassInput(hintStr: String, textStr: String, isNum: Boolean = false): EditText {
+            return EditText(this).apply {
+                hint = hintStr
+                setText(textStr)
+                if (isNum) inputType = android.text.InputType.TYPE_CLASS_NUMBER
+                setTextColor(Color.WHITE)
+                textSize = 13f
+                background = GradientDrawable().apply {
+                    cornerRadius = 12 * density
+                    setColor(Color.parseColor("#1AFFFFFF"))
+                    setStroke(1, Color.parseColor("#26FFFFFF"))
+                }
+                setPadding((12 * density).toInt(), (10 * density).toInt(), (12 * density).toInt(), (10 * density).toInt())
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { bottomMargin = (8 * density).toInt() }
+            }
         }
+
+        val editName = makeGlassInput("اسم الأكشن", step.name)
+        val editDelay = makeGlassInput("التأخير الزمني ms", step.delayAfterMs.toString(), true)
+        val editRepeat = makeGlassInput("مرات التكرار (Repeat Count)", step.repeatCount.toString(), true)
+
         suitePanel.addView(editName)
-
-        val editDelay = EditText(this).apply {
-            hint = "التأخير الزمني ms"
-            setText(step.delayAfterMs.toString())
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER
-            setTextColor(Color.WHITE)
-            setBackgroundColor(Color.parseColor("#151722"))
-            setPadding(16, 12, 16, 12)
-        }
         suitePanel.addView(editDelay)
-
-        val editRepeat = EditText(this).apply {
-            hint = "مرات التكرار (Repeat Count)"
-            setText(step.repeatCount.toString())
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER
-            setTextColor(Color.WHITE)
-            setBackgroundColor(Color.parseColor("#151722"))
-            setPadding(16, 12, 16, 12)
-        }
         suitePanel.addView(editRepeat)
 
-        // قسم التدريب المتعدد للذكاء الاصطناعي
         if (step.thumbnail != null) {
             val txtTraining = TextView(this).apply {
                 text = "🧠 تدريب الذكاء الاصطناعي (${step.trainedVariations.size} زوايا مدربة):"
                 setTextColor(Color.parseColor("#FFD700"))
                 textSize = 11f
-                setPadding(0, (8 * density).toInt(), 0, (4 * density).toInt())
+                setPadding(0, (6 * density).toInt(), 0, (4 * density).toInt())
             }
             suitePanel.addView(txtTraining)
 
             val horizontalScroll = HorizontalScrollView(this).apply {
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
-                    (45 * density).toInt()
+                    (46 * density).toInt()
                 )
+                isVerticalScrollBarEnabled = false
             }
             val trainingContainer = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
 
@@ -737,12 +729,12 @@ class OverlayService : Service() {
                 val vImg = ImageView(this).apply {
                     setImageBitmap(vBmp)
                     scaleType = ImageView.ScaleType.FIT_CENTER
-                    val bg = GradientDrawable().apply {
-                        cornerRadius = 4 * density
+                    background = GradientDrawable().apply {
+                        cornerRadius = 6 * density
+                        setColor(Color.BLACK)
                         setStroke(1, Color.parseColor("#FFD700"))
                     }
-                    background = bg
-                    layoutParams = LinearLayout.LayoutParams((36 * density).toInt(), (36 * density).toInt()).apply {
+                    layoutParams = LinearLayout.LayoutParams((38 * density).toInt(), (38 * density).toInt()).apply {
                         marginEnd = (6 * density).toInt()
                     }
                     setOnLongClickListener {
@@ -761,11 +753,15 @@ class OverlayService : Service() {
                 setTextColor(Color.parseColor("#0B0C10"))
                 textSize = 11f
                 typeface = Typeface.DEFAULT_BOLD
-                val bg = GradientDrawable().apply {
-                    cornerRadius = 8 * density
+                stateListAnimator = null
+                background = GradientDrawable().apply {
+                    cornerRadius = 12 * density
                     setColor(Color.parseColor("#FFD700"))
                 }
-                background = bg
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    (38 * density).toInt()
+                ).apply { topMargin = (6 * density).toInt() }
                 setOnClickListener {
                     val intent = Intent(this@OverlayService, TransparentPickerActivity::class.java).apply {
                         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
@@ -780,8 +776,18 @@ class OverlayService : Service() {
 
         val btnSave = Button(this).apply {
             text = "حفظ"
-            setTextColor(Color.WHITE)
-            setBackgroundColor(Color.parseColor("#10B981"))
+            setTextColor(Color.parseColor("#042614"))
+            textSize = 13f
+            typeface = Typeface.DEFAULT_BOLD
+            stateListAnimator = null
+            background = GradientDrawable().apply {
+                cornerRadius = 14 * density
+                setColor(Color.parseColor("#00E676"))
+            }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (42 * density).toInt()
+            ).apply { topMargin = (10 * density).toInt() }
             setOnClickListener {
                 step.name = editName.text.toString()
                 step.delayAfterMs = editDelay.text.toString().toLongOrNull() ?: 500L
@@ -805,7 +811,7 @@ class OverlayService : Service() {
                         ApexAccessibilityService.instance?.performClick(match.targetCenter.x, match.targetCenter.y)
                         Toast.makeText(applicationContext, "✓ نُفّذ بنجاح! التطابق: ${match.currentSimilarity}%", Toast.LENGTH_SHORT).show()
                     } else {
-                        Toast.makeText(applicationContext, "✕ لم يُعثر على أي من زوايا الهدف (تطابق ${match.currentSimilarity}%)", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(applicationContext, "✕ لم يُعثر على الهدف (تطابق ${match.currentSimilarity}%)", Toast.LENGTH_SHORT).show()
                     }
                 } else if (step.customScript.isNotBlank()) {
                     scriptRunner.execute(step.customScript, step.stepNumber, step.targetArea.centerX(), step.targetArea.centerY())
@@ -830,88 +836,78 @@ class OverlayService : Service() {
             textSize = 15f
             typeface = Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
+            setPadding(0, 0, 0, (10 * density).toInt())
         }
         suitePanel.addView(title)
 
-        val txtSim = TextView(this).apply {
-            text = "نسبة التطابق المطلوبة %:"
-            setTextColor(Color.WHITE)
-            textSize = 11f
-            setPadding(0, (6 * density).toInt(), 0, (2 * density).toInt())
-        }
         val editSim = EditText(this).apply {
             setText(step.similarityPercent.toString())
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
             setTextColor(Color.parseColor("#FFD700"))
-            setBackgroundColor(Color.parseColor("#151722"))
-            setPadding(16, 10, 16, 10)
-        }
-        suitePanel.addView(txtSim)
-        suitePanel.addView(editSim)
-
-        var selectedScope = step.detectScope
-        val cardScopeContainer = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(0, (8 * density).toInt(), 0, (8 * density).toInt())
-        }
-
-        lateinit var cardFull: LinearLayout
-
-        fun style(card: LinearLayout, isSel: Boolean) {
-            val bg = GradientDrawable().apply {
-                cornerRadius = 10 * density
-                setColor(if (isSel) Color.parseColor("#262214") else Color.parseColor("#151722"))
-                setStroke(1, if (isSel) Color.parseColor("#FFD700") else Color.parseColor("#333A4D"))
+            textSize = 13f
+            background = GradientDrawable().apply {
+                cornerRadius = 12 * density
+                setColor(Color.parseColor("#1AFFFFFF"))
+                setStroke(1, Color.parseColor("#26FFFFFF"))
             }
-            card.background = bg
-            (card.getChildAt(0) as TextView).text = if (isSel) "● " else "○ "
-            (card.getChildAt(0) as TextView).setTextColor(if (isSel) Color.parseColor("#FFD700") else Color.GRAY)
-        }
-
-        cardFull = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
             setPadding((12 * density).toInt(), (10 * density).toInt(), (12 * density).toInt(), (10 * density).toInt())
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = (5 * density).toInt() }
-            setOnClickListener {
-                selectedScope = DetectScope.FULL_SCREEN
-                style(cardFull, true)
+            ).apply { bottomMargin = (10 * density).toInt() }
+        }
+        suitePanel.addView(editSim)
+
+        val cardFull = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding((14 * density).toInt(), (12 * density).toInt(), (14 * density).toInt(), (12 * density).toInt())
+            background = GradientDrawable().apply {
+                cornerRadius = 12 * density
+                setColor(Color.parseColor("#262214"))
+                setStroke(1, Color.parseColor("#FFD700"))
             }
-        }
-        val icon = TextView(this).apply { textSize = 12f }
-        val labelTextView = TextView(this).apply {
-            this.text = "Full Screen (كامل الشاشة للبحث عن الهدف وزواياه)"
-            setTextColor(Color.WHITE)
-            textSize = 11f
-        }
-        cardFull.addView(icon)
-        cardFull.addView(labelTextView)
-        cardScopeContainer.addView(cardFull)
-        suitePanel.addView(cardScopeContainer)
-
-        style(cardFull, true)
-
-        val btnSave = Button(this).apply {
-            text = "SAVE"
-            setTextColor(Color.parseColor("#0B0C10"))
-            setBackgroundColor(Color.parseColor("#FFD700"))
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = (6 * density).toInt() }
+            )
+        }
+        val icon = TextView(this).apply {
+            text = "● "
+            setTextColor(Color.parseColor("#FFD700"))
+            textSize = 13f
+        }
+        val labelTextView = TextView(this).apply {
+            text = "Full Screen (كامل الشاشة للبحث عن الهدف)"
+            setTextColor(Color.WHITE)
+            textSize = 12f
+        }
+        cardFull.addView(icon)
+        cardFull.addView(labelTextView)
+        suitePanel.addView(cardFull)
+
+        val btnSave = Button(this).apply {
+            text = "حفظ"
+            setTextColor(Color.parseColor("#0B0C10"))
+            stateListAnimator = null
+            background = GradientDrawable().apply {
+                cornerRadius = 14 * density
+                setColor(Color.parseColor("#FFD700"))
+            }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (42 * density).toInt()
+            ).apply { topMargin = (12 * density).toInt() }
             setOnClickListener {
                 step.similarityPercent = editSim.text.toString().toIntOrNull() ?: 70
-                step.detectScope = selectedScope
+                step.detectScope = DetectScope.FULL_SCREEN
                 renderMainJobsView()
             }
         }
         suitePanel.addView(btnSave)
     }
 
-    // 4. محرر الكود مع شريط الأوامر السريعة للمبتدئين في الأعلى (المكان المحدد في الصورة 4)
+    // محرر الكود الزجاجي مع كبسولات الأوامر السريعة
     private fun openJsEditor(index: Int) {
         setKeyboardFocusable(true)
         suitePanel.removeAllViews()
@@ -921,12 +917,13 @@ class OverlayService : Service() {
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, 0, 0, (6 * density).toInt())
+            setPadding(0, 0, 0, (8 * density).toInt())
         }
         val btnBack = TextView(this).apply {
             text = "← رجوع"
             setTextColor(Color.parseColor("#FFD700"))
             textSize = 14f
+            typeface = Typeface.DEFAULT_BOLD
             setOnClickListener { renderMainJobsView() }
         }
         val title = TextView(this).apply {
@@ -943,14 +940,18 @@ class OverlayService : Service() {
 
         val editCode = EditText(this).apply {
             setText(step.customScript)
-            setTextColor(Color.WHITE)
-            setBackgroundColor(Color.parseColor("#0B0C10"))
+            setTextColor(Color.parseColor("#38BDF8"))
+            background = GradientDrawable().apply {
+                cornerRadius = 16 * density
+                setColor(Color.parseColor("#FA070A12"))
+                setStroke(1, Color.parseColor("#1FFFFFFF"))
+            }
             setPadding(16, 16, 16, 16)
-            textSize = 11f
+            textSize = 12f
             typeface = Typeface.MONOSPACE
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                (130 * density).toInt()
+                (140 * density).toInt()
             )
             addTextChangedListener(CodeSyntaxHighlighter())
         }
@@ -961,30 +962,31 @@ class OverlayService : Service() {
             editCode.text.replace(min(start, end), max(start, end), snippet)
         }
 
-        // شريط الأوامر السريعة المنزلق للمبتدئين (الصورة 4)
         val toolbarScroll = HorizontalScrollView(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                (36 * density).toInt()
-            ).apply { bottomMargin = (6 * density).toInt() }
+                (38 * density).toInt()
+            ).apply { bottomMargin = (8 * density).toInt() }
+            isVerticalScrollBarEnabled = false
         }
         val toolbarContainer = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
 
         fun makeSnippetBtn(label: String, code: String): Button {
             return Button(this).apply {
                 text = label
-                textSize = 10f
-                setTextColor(Color.parseColor("#0B0C10"))
-                val bg = GradientDrawable().apply {
-                    cornerRadius = 6 * density
-                    setColor(Color.parseColor("#FFD700"))
+                textSize = 11f
+                setTextColor(Color.parseColor("#FFD700"))
+                stateListAnimator = null
+                background = GradientDrawable().apply {
+                    cornerRadius = 10 * density
+                    setColor(Color.parseColor("#1AFFE082"))
+                    setStroke(1, Color.parseColor("#4DFFD700"))
                 }
-                background = bg
-                setPadding(12, 0, 12, 0)
+                setPadding((12 * density).toInt(), 0, (12 * density).toInt(), 0)
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
-                    (28 * density).toInt()
-                ).apply { marginEnd = (4 * density).toInt() }
+                    (30 * density).toInt()
+                ).apply { marginEnd = (6 * density).toInt() }
                 setOnClickListener { insertSnippet(code) }
             }
         }
@@ -998,18 +1000,18 @@ class OverlayService : Service() {
 
         val btnPickTargetName = Button(this).apply {
             text = "📁 اسم صورة"
-            textSize = 10f
+            textSize = 11f
             setTextColor(Color.WHITE)
-            val bg = GradientDrawable().apply {
-                cornerRadius = 6 * density
-                setColor(Color.parseColor("#1F222E"))
-                setStroke(1, Color.parseColor("#D4AF37"))
+            stateListAnimator = null
+            background = GradientDrawable().apply {
+                cornerRadius = 10 * density
+                setColor(Color.parseColor("#14FFFFFF"))
+                setStroke(1, Color.parseColor("#26FFFFFF"))
             }
-            background = bg
-            setPadding(12, 0, 12, 0)
+            setPadding((12 * density).toInt(), 0, (12 * density).toInt(), 0)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
-                (28 * density).toInt()
+                (30 * density).toInt()
             )
             setOnClickListener {
                 val targets = ImageLibrary.targetImages.keys.toList()
@@ -1029,7 +1031,17 @@ class OverlayService : Service() {
         val btnSave = Button(this).apply {
             text = "💾 حفظ الكود"
             setTextColor(Color.parseColor("#0B0C10"))
-            setBackgroundColor(Color.parseColor("#FFD700"))
+            textSize = 14f
+            typeface = Typeface.DEFAULT_BOLD
+            stateListAnimator = null
+            background = GradientDrawable().apply {
+                cornerRadius = 14 * density
+                setColor(Color.parseColor("#FFD700"))
+            }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (44 * density).toInt()
+            ).apply { topMargin = (10 * density).toInt() }
             setOnClickListener {
                 step.customScript = editCode.text.toString()
                 renderMainJobsView()
@@ -1038,7 +1050,6 @@ class OverlayService : Service() {
         suitePanel.addView(btnSave)
     }
 
-    // نافذة الإعدادات الشاملة للمهمة
     private fun showGlobalJobSettingsDialog() {
         suitePanel.removeAllViews()
         val density = resources.displayMetrics.density
@@ -1056,14 +1067,20 @@ class OverlayService : Service() {
         val txtLoop = TextView(this).apply {
             text = "عدد مرات تكرار المهمة (0 = تكرار لا نهائي):"
             setTextColor(Color.WHITE)
-            textSize = 11f
+            textSize = 12f
+            setPadding(0, 0, 0, (6 * density).toInt())
         }
         val editLoop = EditText(this).apply {
             setText(loopCountLimit.toString())
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
             setTextColor(Color.parseColor("#FFD700"))
-            setBackgroundColor(Color.parseColor("#151722"))
-            setPadding(16, 10, 16, 10)
+            textSize = 13f
+            background = GradientDrawable().apply {
+                cornerRadius = 12 * density
+                setColor(Color.parseColor("#1AFFFFFF"))
+                setStroke(1, Color.parseColor("#26FFFFFF"))
+            }
+            setPadding((12 * density).toInt(), (10 * density).toInt(), (12 * density).toInt(), (10 * density).toInt())
         }
         suitePanel.addView(txtLoop)
         suitePanel.addView(editLoop)
@@ -1071,11 +1088,17 @@ class OverlayService : Service() {
         val btnSave = Button(this).apply {
             text = "حفظ والعودة"
             setTextColor(Color.parseColor("#0B0C10"))
-            setBackgroundColor(Color.parseColor("#FFD700"))
+            textSize = 13f
+            typeface = Typeface.DEFAULT_BOLD
+            stateListAnimator = null
+            background = GradientDrawable().apply {
+                cornerRadius = 14 * density
+                setColor(Color.parseColor("#FFD700"))
+            }
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = (10 * density).toInt() }
+                (42 * density).toInt()
+            ).apply { topMargin = (12 * density).toInt() }
             setOnClickListener {
                 loopCountLimit = editLoop.text.toString().toIntOrNull() ?: 0
                 renderMainJobsView()
