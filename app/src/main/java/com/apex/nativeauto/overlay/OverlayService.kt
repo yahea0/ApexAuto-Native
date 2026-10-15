@@ -31,6 +31,7 @@ import com.apex.nativeauto.macro.*
 import com.apex.nativeauto.picker.TransparentPickerActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -40,7 +41,15 @@ import kotlin.math.min
 class OverlayService : Service() {
 
     companion object {
-        private var instance: OverlayService? = null
+        var instance: OverlayService? = null
+            private set
+
+        val isRunning: Boolean
+            get() = instance != null
+
+        const val ACTION_EDIT_SCRIPT = "ACTION_EDIT_SCRIPT"
+        const val ACTION_RUN_MINI_CONTROLLER = "ACTION_RUN_MINI_CONTROLLER"
+        const val EXTRA_SCRIPT_NAME = "EXTRA_SCRIPT_NAME"
 
         fun addGalleryTarget(bitmap: Bitmap) {
             instance?.let { service ->
@@ -55,7 +64,7 @@ class OverlayService : Service() {
                         thumbnail = bitmap,
                         similarityPercent = 70,
                         detectScope = DetectScope.FULL_SCREEN,
-                        customScript = "" // فارغ كلياً
+                        customScript = ""
                     )
                     ImageLibrary.saveTarget(targetName, bitmap)
                     service.stepsList.add(newStep)
@@ -96,15 +105,20 @@ class OverlayService : Service() {
     private lateinit var rootContainer: FrameLayout
     private lateinit var bubbleView: TextView
     private lateinit var suitePanel: LinearLayout
+    private lateinit var miniControllerView: LinearLayout
+    private lateinit var miniStatusText: TextView
 
     val stepsList = mutableListOf<MacroStep>()
     private val scriptRunner = ScriptRunner()
     private val scope = CoroutineScope(Dispatchers.Default)
     val mainHandler = Handler(Looper.getMainLooper())
 
+    private var executionJob: Job? = null
     private var isRunningLoop = false
     private var isAttached = false
     private var loopCountLimit = 0
+    private var currentExecutionIndex = 0 // نقطة التوقف لمتابعة الخطوات (Resume)
+    private var currentScriptName = "السكربت الحالي"
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -112,6 +126,7 @@ class OverlayService : Service() {
         super.onCreate()
         instance = this
         ImageLibrary.init(this)
+        ScriptStorage.init(this)
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         startForegroundServiceNotification()
         buildOverlayUI()
@@ -129,6 +144,21 @@ class OverlayService : Service() {
                 e.printStackTrace()
             }
         }
+
+        val sName = intent?.getStringExtra(EXTRA_SCRIPT_NAME)
+        when (intent?.action) {
+            ACTION_EDIT_SCRIPT -> {
+                if (!sName.isNullOrBlank()) {
+                    loadScriptForEditing(sName)
+                }
+            }
+            ACTION_RUN_MINI_CONTROLLER -> {
+                if (!sName.isNullOrBlank()) {
+                    loadScriptForMiniRunner(sName)
+                }
+            }
+        }
+
         return START_STICKY
     }
 
@@ -194,7 +224,6 @@ class OverlayService : Service() {
         }
     }
 
-    // دالة تكبير / تصغير نافذة الاستوديو ديناميكياً
     private fun setPanelDimensions(expandedForEditor: Boolean) {
         val density = resources.displayMetrics.density
         val targetWidth = if (expandedForEditor) {
@@ -212,6 +241,7 @@ class OverlayService : Service() {
         rootContainer = FrameLayout(this)
         val density = resources.displayMetrics.density
 
+        // 1. الفقاعة العائمة الأصلية
         bubbleView = TextView(this).apply {
             text = "⚡"
             textSize = 21f
@@ -225,6 +255,7 @@ class OverlayService : Service() {
             layoutParams = FrameLayout.LayoutParams((50 * density).toInt(), (50 * density).toInt())
         }
 
+        // 2. لوحة الاستوديو العائمة الكبيرة
         suitePanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             visibility = View.GONE
@@ -238,10 +269,121 @@ class OverlayService : Service() {
             layoutParams = FrameLayout.LayoutParams((345 * density).toInt(), FrameLayout.LayoutParams.WRAP_CONTENT)
         }
 
+        // 3. الزر العائم الصغير الزجاجي (Mini Glass Controller)
+        buildMiniController(density)
+
         rootContainer.addView(bubbleView)
         rootContainer.addView(suitePanel)
+        rootContainer.addView(miniControllerView)
 
-        bubbleView.setOnTouchListener(object : View.OnTouchListener {
+        bubbleView.setOnTouchListener(createDragTouchListener(params) {
+            togglePanelExpansion(true)
+        })
+
+        miniControllerView.setOnTouchListener(createDragTouchListener(params, isClickable = false))
+
+        windowManager.addView(rootContainer, params)
+        isAttached = true
+        renderMainJobsView()
+    }
+
+    // بناء الزر العائم الزجاجي الصغير (Mini Glass Controller)
+    private fun buildMiniController(density: Float) {
+        miniControllerView = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            visibility = View.GONE
+            setPadding((12 * density).toInt(), (10 * density).toInt(), (12 * density).toInt(), (10 * density).toInt())
+            background = GradientDrawable().apply {
+                cornerRadius = 20 * density
+                setColor(Color.parseColor("#E6080C14"))
+                setStroke((1.2f * density).toInt(), Color.parseColor("#6600E676"))
+            }
+            layoutParams = FrameLayout.LayoutParams((300 * density).toInt(), FrameLayout.LayoutParams.WRAP_CONTENT)
+        }
+
+        // شريط العنوان والمتحكم
+        val topRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, 0, 0, (6 * density).toInt())
+        }
+
+        miniStatusText = TextView(this).apply {
+            text = "⚡ السكربت جاهز"
+            setTextColor(Color.parseColor("#FFD700"))
+            textSize = 12f
+            typeface = Typeface.DEFAULT_BOLD
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+
+        val btnExitMini = TextView(this).apply {
+            text = "✕"
+            textSize = 13f
+            setTextColor(Color.parseColor("#94A3B8"))
+            setPadding((8 * density).toInt(), 0, (4 * density).toInt(), 0)
+            setOnClickListener {
+                stopExecution()
+                miniControllerView.visibility = View.GONE
+                bubbleView.visibility = View.VISIBLE
+            }
+        }
+
+        topRow.addView(miniStatusText)
+        topRow.addView(btnExitMini)
+        miniControllerView.addView(topRow)
+
+        // الأزرار الفرعية الثلاثة المطلوبة
+        val btnsRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (36 * density).toInt()
+            )
+        }
+
+        fun makeMiniActionBtn(label: String, bgColor: Int, txtColor: Int, onClick: () -> Unit): Button {
+            return Button(this).apply {
+                text = label
+                textSize = 10.5f
+                typeface = Typeface.DEFAULT_BOLD
+                setTextColor(txtColor)
+                stateListAnimator = null
+                background = GradientDrawable().apply {
+                    cornerRadius = 10 * density
+                    setColor(bgColor)
+                }
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f).apply {
+                    marginEnd = (3 * density).toInt()
+                    marginStart = (3 * density).toInt()
+                }
+                setOnClickListener { onClick() }
+            }
+        }
+
+        // 1. تشغيل من البداية
+        val btnStartFresh = makeMiniActionBtn("▶ من البداية", Color.parseColor("#FFD700"), Color.parseColor("#0B0C10")) {
+            startExecutionFromBeginning()
+        }
+
+        // 2. إيقاف (Stop)
+        val btnStop = makeMiniActionBtn("⏹ إيقاف", Color.parseColor("#EF4444"), Color.WHITE) {
+            stopExecution()
+            miniStatusText.text = "⏹ متوقف عند الخطوة (${currentExecutionIndex + 1})"
+        }
+
+        // 3. تكملة الخطوات (Resume)
+        val btnResume = makeMiniActionBtn("⏯ تكملة", Color.parseColor("#00E676"), Color.parseColor("#042614")) {
+            resumeExecution()
+        }
+
+        btnsRow.addView(btnStartFresh)
+        btnsRow.addView(btnStop)
+        btnsRow.addView(btnResume)
+        miniControllerView.addView(btnsRow)
+    }
+
+    private fun createDragTouchListener(params: WindowManager.LayoutParams, isClickable: Boolean = true): View.OnTouchListener {
+        return object : View.OnTouchListener {
             private var initialX = 0
             private var initialY = 0
             private var touchX = 0f
@@ -270,7 +412,7 @@ class OverlayService : Service() {
                         return true
                     }
                     MotionEvent.ACTION_UP -> {
-                        if (System.currentTimeMillis() - downTime < 220 && abs(event.rawX - touchX) < 15) {
+                        if (isClickable && System.currentTimeMillis() - downTime < 220 && abs(event.rawX - touchX) < 15) {
                             togglePanelExpansion(true)
                         }
                         return true
@@ -278,11 +420,7 @@ class OverlayService : Service() {
                 }
                 return false
             }
-        })
-
-        windowManager.addView(rootContainer, params)
-        isAttached = true
-        renderMainJobsView()
+        }
     }
 
     fun renderMainJobsView() {
@@ -297,9 +435,9 @@ class OverlayService : Service() {
             setPadding(0, 0, 0, (10 * density).toInt())
         }
         val title = TextView(this).apply {
-            text = "⚡ APEX ROYAL STUDIO"
+            text = "⚡ $currentScriptName"
             setTextColor(Color.parseColor("#FFD700"))
-            textSize = 14f
+            textSize = 13.5f
             typeface = Typeface.DEFAULT_BOLD
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
@@ -316,13 +454,15 @@ class OverlayService : Service() {
                     setStroke(1, Color.parseColor("#33FFFFFF"))
                 }
                 val s = (28 * density).toInt()
-                layoutParams = LinearLayout.LayoutParams(s, s).apply { marginEnd = (6 * density).toInt() }
+                layoutParams = LinearLayout.LayoutParams(s, s).apply { marginEnd = (5 * density).toInt() }
                 setOnClickListener { onClick() }
             }
         }
 
         header.addView(title)
         header.addView(makeGlassActionIcon("➕") { addEmptyCustomStep() })
+        header.addView(makeGlassActionIcon("💾") { showSaveScriptDialog() }) // حفظ السكربت الحالي
+        header.addView(makeGlassActionIcon("📜") { showInAppScriptsRepository() }) // مستودع السكربتات
         header.addView(makeGlassActionIcon("📁") { showInAppTargetPicker() })
         header.addView(makeGlassActionIcon("⚙️") { showGlobalJobSettingsDialog() })
         header.addView(makeGlassActionIcon("✕") { togglePanelExpansion(false) })
@@ -560,11 +700,316 @@ class OverlayService : Service() {
                 (46 * density).toInt()
             ).apply { topMargin = (8 * density).toInt() }
             setOnClickListener {
-                if (isRunningLoop) stopExecution() else startExecution()
+                if (isRunningLoop) stopExecution() else startExecutionFromBeginning()
                 renderMainJobsView()
             }
         }
         suitePanel.addView(btnRunJob)
+    }
+
+    // نافذة حفظ السكربت الحالي
+    private fun showSaveScriptDialog() {
+        setKeyboardFocusable(true)
+        suitePanel.removeAllViews()
+        val density = resources.displayMetrics.density
+
+        val title = TextView(this).apply {
+            text = "💾 حفظ السكربت الحالي"
+            setTextColor(Color.parseColor("#FFD700"))
+            textSize = 15f
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, (12 * density).toInt())
+        }
+        suitePanel.addView(title)
+
+        val editName = EditText(this).apply {
+            hint = "اسم السكربت (مثال: FarmScript)"
+            setText(if (currentScriptName == "السكربت الحالي") "Script_${stepsList.size}_steps" else currentScriptName)
+            setTextColor(Color.WHITE)
+            textSize = 13f
+            background = GradientDrawable().apply {
+                cornerRadius = 12 * density
+                setColor(Color.parseColor("#1AFFFFFF"))
+                setStroke(1, Color.parseColor("#26FFFFFF"))
+            }
+            setPadding((12 * density).toInt(), (10 * density).toInt(), (12 * density).toInt(), (10 * density).toInt())
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = (12 * density).toInt() }
+        }
+        suitePanel.addView(editName)
+
+        val btnSave = Button(this).apply {
+            text = "حفظ في المستودع"
+            setTextColor(Color.parseColor("#0B0C10"))
+            textSize = 13f
+            typeface = Typeface.DEFAULT_BOLD
+            stateListAnimator = null
+            background = GradientDrawable().apply {
+                cornerRadius = 14 * density
+                setColor(Color.parseColor("#FFD700"))
+            }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (42 * density).toInt()
+            )
+            setOnClickListener {
+                val name = editName.text.toString().trim()
+                if (name.isNotBlank()) {
+                    val ok = ScriptStorage.saveScript(name, stepsList, loopCountLimit)
+                    if (ok) {
+                        currentScriptName = name
+                        Toast.makeText(this@OverlayService, "✓ تم حفظ السكربت ($name) بنجاح!", Toast.LENGTH_SHORT).show()
+                        renderMainJobsView()
+                    } else {
+                        Toast.makeText(this@OverlayService, "فشل حفظ السكربت!", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+        suitePanel.addView(btnSave)
+
+        val btnCancel = Button(this).apply {
+            text = "إلغاء"
+            setTextColor(Color.parseColor("#94A3B8"))
+            textSize = 12f
+            stateListAnimator = null
+            background = GradientDrawable().apply {
+                cornerRadius = 14 * density
+                setColor(Color.parseColor("#14FFFFFF"))
+                setStroke(1, Color.parseColor("#1FFFFFFF"))
+            }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (40 * density).toInt()
+            ).apply { topMargin = (8 * density).toInt() }
+            setOnClickListener { renderMainJobsView() }
+        }
+        suitePanel.addView(btnCancel)
+    }
+
+    // مستودع السكربتات داخل الاستوديو العائم
+    private fun showInAppScriptsRepository() {
+        suitePanel.removeAllViews()
+        val density = resources.displayMetrics.density
+
+        val title = TextView(this).apply {
+            text = "📜 مستودع السكربتات المحفوظة"
+            setTextColor(Color.parseColor("#FFD700"))
+            textSize = 15f
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, (10 * density).toInt())
+        }
+        suitePanel.addView(title)
+
+        val scripts = ScriptStorage.getAllScripts()
+        val scroll = ScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (220 * density).toInt()
+            )
+            isVerticalScrollBarEnabled = false
+        }
+        val container = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+
+        if (scripts.isEmpty()) {
+            val empty = TextView(this).apply {
+                text = "لا توجد سكربتات محفوظة.\nاستخدم زر 💾 في الأعلى لحفظ السكربت الحالي."
+                setTextColor(Color.parseColor("#94A3B8"))
+                textSize = 12f
+                gravity = Gravity.CENTER
+                setPadding(0, (30 * density).toInt(), 0, 0)
+            }
+            container.addView(empty)
+        } else {
+            scripts.forEach { sName ->
+                val row = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    setPadding((10 * density).toInt(), (8 * density).toInt(), (10 * density).toInt(), (8 * density).toInt())
+                    background = GradientDrawable().apply {
+                        cornerRadius = 12 * density
+                        setColor(Color.parseColor("#14FFFFFF"))
+                        setStroke(1, Color.parseColor("#26FFFFFF"))
+                    }
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply { topMargin = (6 * density).toInt() }
+                }
+
+                val txt = TextView(this).apply {
+                    text = sName
+                    setTextColor(Color.WHITE)
+                    textSize = 13f
+                    typeface = Typeface.DEFAULT_BOLD
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                }
+
+                val btnLoad = TextView(this).apply {
+                    text = "✏️ فتح"
+                    setTextColor(Color.parseColor("#FFD700"))
+                    textSize = 12f
+                    setPadding((8 * density).toInt(), (4 * density).toInt(), (8 * density).toInt(), (4 * density).toInt())
+                    setOnClickListener {
+                        loadScriptForEditing(sName)
+                    }
+                }
+
+                val btnRun = TextView(this).apply {
+                    text = "▶️ تشغيل"
+                    setTextColor(Color.parseColor("#00E676"))
+                    textSize = 12f
+                    setPadding((8 * density).toInt(), (4 * density).toInt(), (8 * density).toInt(), (4 * density).toInt())
+                    setOnClickListener {
+                        loadScriptForMiniRunner(sName)
+                    }
+                }
+
+                row.addView(txt)
+                row.addView(btnLoad)
+                row.addView(btnRun)
+                container.addView(row)
+            }
+        }
+
+        scroll.addView(container)
+        suitePanel.addView(scroll)
+
+        val btnBack = Button(this).apply {
+            text = "رجوع"
+            setTextColor(Color.parseColor("#94A3B8"))
+            textSize = 12f
+            stateListAnimator = null
+            background = GradientDrawable().apply {
+                cornerRadius = 14 * density
+                setColor(Color.parseColor("#14FFFFFF"))
+                setStroke(1, Color.parseColor("#1FFFFFFF"))
+            }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (40 * density).toInt()
+            ).apply { topMargin = (10 * density).toInt() }
+            setOnClickListener { renderMainJobsView() }
+        }
+        suitePanel.addView(btnBack)
+    }
+
+    // فتح سكربت للتعديل
+    fun loadScriptForEditing(name: String) {
+        val data = ScriptStorage.loadScript(name)
+        if (data != null) {
+            stepsList.clear()
+            stepsList.addAll(data.first)
+            loopCountLimit = data.second
+            currentScriptName = name
+            currentExecutionIndex = 0
+            stopExecution()
+            miniControllerView.visibility = View.GONE
+            togglePanelExpansion(true)
+            Toast.makeText(this, "تم تحميل السكربت للتعديل!", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // فتح سكربت للتشغيل عبر الزر العائم الصغير
+    fun loadScriptForMiniRunner(name: String) {
+        val data = ScriptStorage.loadScript(name)
+        if (data != null) {
+            stepsList.clear()
+            stepsList.addAll(data.first)
+            loopCountLimit = data.second
+            currentScriptName = name
+            currentExecutionIndex = 0
+            stopExecution()
+
+            bubbleView.visibility = View.GONE
+            suitePanel.visibility = View.GONE
+            miniControllerView.visibility = View.VISIBLE
+            miniStatusText.text = "⚡ $name (جاهز)"
+            Toast.makeText(this, "تم تفعيل المتحكم العائم للسكربت!", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // --- منطق التشغيل والتكملة (Resume & Restart) ---
+
+    private fun startExecutionFromBeginning() {
+        stopExecution()
+        currentExecutionIndex = 0
+        runExecutionLoop()
+    }
+
+    private fun resumeExecution() {
+        if (isRunningLoop) return
+        runExecutionLoop()
+    }
+
+    private fun runExecutionLoop() {
+        if (stepsList.isEmpty()) {
+            Toast.makeText(applicationContext, "السكربت لا يحتوي على أي خطوات!", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        isRunningLoop = true
+        miniStatusText.text = "▶ جاري تشغيل: $currentScriptName"
+
+        executionJob = scope.launch {
+            var currentCycle = 0
+            while (isRunningLoop) {
+                if (loopCountLimit > 0 && currentCycle >= loopCountLimit) break
+
+                val startIndex = if (currentExecutionIndex in 0 until stepsList.size) currentExecutionIndex else 0
+
+                for (i in startIndex until stepsList.size) {
+                    if (!isRunningLoop) {
+                        currentExecutionIndex = i
+                        break
+                    }
+
+                    currentExecutionIndex = i
+                    val step = stepsList[i]
+                    if (!step.enabled) continue
+
+                    mainHandler.post {
+                        miniStatusText.text = "⚡ تنفيذ [${i + 1}/${stepsList.size}]: ${step.name}"
+                    }
+
+                    val screen = ScreenCaptureManager.getRealScreenshot()
+                    if (screen != null && step.thumbnail != null) {
+                        val match = ImageMatcher.findTarget(step, screen)
+                        if (match.isMatched && match.targetCenter != null) {
+                            for (r in 0 until step.repeatCount) {
+                                ApexAccessibilityService.instance?.performClick(match.targetCenter.x, match.targetCenter.y)
+                                Thread.sleep(60)
+                            }
+                        }
+                    }
+
+                    if (step.customScript.isNotBlank()) {
+                        scriptRunner.execute(step.customScript, step.stepNumber, step.targetArea.centerX(), step.targetArea.centerY())
+                    }
+                    Thread.sleep(step.delayAfterMs)
+                }
+
+                if (isRunningLoop) {
+                    currentExecutionIndex = 0
+                    currentCycle++
+                }
+            }
+            isRunningLoop = false
+            mainHandler.post {
+                miniStatusText.text = "⏹ متوقف: $currentScriptName"
+                renderMainJobsView()
+            }
+        }
+    }
+
+    private fun stopExecution() {
+        isRunningLoop = false
+        executionJob?.cancel()
+        executionJob = null
     }
 
     private fun addEmptyCustomStep() {
@@ -574,7 +1019,7 @@ class OverlayService : Service() {
             name = "Script Step $nextNum",
             type = ActionType.JS_SCRIPT,
             thumbnail = null,
-            customScript = "", // فارغ كلياً
+            customScript = "",
             delayAfterMs = 300L
         )
         stepsList.add(newStep)
@@ -914,10 +1359,9 @@ class OverlayService : Service() {
         suitePanel.addView(btnSave)
     }
 
-    // 🌟 محرر الكود الموسع والمطور مع أدوات الحافظة والنسخ واللصق
     private fun openJsEditor(index: Int) {
         setKeyboardFocusable(true)
-        setPanelDimensions(true) // تكبير النافذة لتصبح احترافية وأوسع
+        setPanelDimensions(true)
         suitePanel.removeAllViews()
         val density = resources.displayMetrics.density
         val step = stepsList[index]
@@ -946,7 +1390,6 @@ class OverlayService : Service() {
         header.addView(title)
         suitePanel.addView(header)
 
-        // مساحة كتابة الكود بتصميم واسع وارتفاع 240dp مع تفعيل كامل للضغط المطول والتحديد
         val editCode = EditText(this).apply {
             setText(step.customScript)
             setTextColor(Color.parseColor("#38BDF8"))
@@ -962,17 +1405,16 @@ class OverlayService : Service() {
             isFocusable = true
             isFocusableInTouchMode = true
             isLongClickable = true
-            setTextIsSelectable(true) // دعم الضغط المطول والنظام
+            setTextIsSelectable(true)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                (240 * density).toInt() // مساحة واسعة ومريحة
+                (240 * density).toInt()
             )
             addTextChangedListener(CodeSyntaxHighlighter())
         }
 
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
 
-        // شريط أدوات الحافظة السريعة (نسخ، لصق، تحديد الكل، مسح)
         val editActionsBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -1040,7 +1482,6 @@ class OverlayService : Service() {
             editCode.text.replace(min(start, end), max(start, end), snippet)
         }
 
-        // شريط الأوامر السريعة المساعد
         val toolbarScroll = HorizontalScrollView(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -1111,7 +1552,6 @@ class OverlayService : Service() {
         toolbarScroll.addView(toolbarContainer)
         suitePanel.addView(toolbarScroll)
 
-        // إضافة صندوق الكود
         suitePanel.addView(editCode)
 
         val btnSave = Button(this).apply {
@@ -1202,47 +1642,10 @@ class OverlayService : Service() {
         }
     }
 
-    private fun startExecution() {
-        isRunningLoop = true
-        scope.launch {
-            var currentCycle = 0
-            while (isRunningLoop) {
-                if (loopCountLimit > 0 && currentCycle >= loopCountLimit) break
-
-                for (step in stepsList) {
-                    if (!isRunningLoop) break
-                    if (!step.enabled) continue
-
-                    val screen = ScreenCaptureManager.getRealScreenshot()
-                    if (screen != null && step.thumbnail != null) {
-                        val match = ImageMatcher.findTarget(step, screen)
-                        if (match.isMatched && match.targetCenter != null) {
-                            for (r in 0 until step.repeatCount) {
-                                ApexAccessibilityService.instance?.performClick(match.targetCenter.x, match.targetCenter.y)
-                                Thread.sleep(60)
-                            }
-                        }
-                    }
-
-                    if (step.customScript.isNotBlank()) {
-                        scriptRunner.execute(step.customScript, step.stepNumber, step.targetArea.centerX(), step.targetArea.centerY())
-                    }
-                    Thread.sleep(step.delayAfterMs)
-                }
-                currentCycle++
-            }
-            isRunningLoop = false
-            mainHandler.post { renderMainJobsView() }
-        }
-    }
-
-    private fun stopExecution() {
-        isRunningLoop = false
-    }
-
     fun togglePanelExpansion(expand: Boolean) {
         if (expand) {
             bubbleView.visibility = View.GONE
+            miniControllerView.visibility = View.GONE
             suitePanel.visibility = View.VISIBLE
             renderMainJobsView()
         } else {
