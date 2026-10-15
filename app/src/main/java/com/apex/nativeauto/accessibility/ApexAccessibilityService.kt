@@ -34,11 +34,42 @@ class ApexAccessibilityService : AccessibilityService() {
     }
 
     fun performClick(x: Float, y: Float, onComplete: (() -> Unit)? = null): Boolean {
-        val path = Path().apply {
-            moveTo(x, y)
-        }
+        val path = Path().apply { moveTo(x, y) }
         val gesture = GestureDescription.Builder()
             .addStroke(GestureDescription.StrokeDescription(path, 0, 50))
+            .build()
+
+        return dispatchGesture(gesture, object : AccessibilityService.GestureResultCallback() {
+            override fun onCompleted(gestureDescription: GestureDescription?) {
+                super.onCompleted(gestureDescription)
+                onComplete?.invoke()
+            }
+        }, null)
+    }
+
+    // دعم السحب بإحداثيات ووقت مخصص
+    fun performSwipe(x1: Float, y1: Float, x2: Float, y2: Float, durationMs: Long = 300, onComplete: (() -> Unit)? = null): Boolean {
+        val path = Path().apply {
+            moveTo(x1, y1)
+            lineTo(x2, y2)
+        }
+        val gesture = GestureDescription.Builder()
+            .addStroke(GestureDescription.StrokeDescription(path, 0, durationMs))
+            .build()
+
+        return dispatchGesture(gesture, object : AccessibilityService.GestureResultCallback() {
+            override fun onCompleted(gestureDescription: GestureDescription?) {
+                super.onCompleted(gestureDescription)
+                onComplete?.invoke()
+            }
+        }, null)
+    }
+
+    // دعم الضغط المطول Long Click
+    fun performLongClick(x: Float, y: Float, durationMs: Long = 800, onComplete: (() -> Unit)? = null): Boolean {
+        val path = Path().apply { moveTo(x, y) }
+        val gesture = GestureDescription.Builder()
+            .addStroke(GestureDescription.StrokeDescription(path, 0, durationMs))
             .build()
 
         return dispatchGesture(gesture, object : AccessibilityService.GestureResultCallback() {
