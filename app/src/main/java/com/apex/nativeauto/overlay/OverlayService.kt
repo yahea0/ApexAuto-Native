@@ -117,7 +117,7 @@ class OverlayService : Service() {
     private var isRunningLoop = false
     private var isAttached = false
     private var loopCountLimit = 0
-    private var currentExecutionIndex = 0 // نقطة التوقف لمتابعة الخطوات (Resume)
+    private var currentExecutionIndex = 0
     private var currentScriptName = "السكربت الحالي"
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -241,7 +241,6 @@ class OverlayService : Service() {
         rootContainer = FrameLayout(this)
         val density = resources.displayMetrics.density
 
-        // 1. الفقاعة العائمة الأصلية
         bubbleView = TextView(this).apply {
             text = "⚡"
             textSize = 21f
@@ -255,7 +254,6 @@ class OverlayService : Service() {
             layoutParams = FrameLayout.LayoutParams((50 * density).toInt(), (50 * density).toInt())
         }
 
-        // 2. لوحة الاستوديو العائمة الكبيرة
         suitePanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             visibility = View.GONE
@@ -269,25 +267,24 @@ class OverlayService : Service() {
             layoutParams = FrameLayout.LayoutParams((345 * density).toInt(), FrameLayout.LayoutParams.WRAP_CONTENT)
         }
 
-        // 3. الزر العائم الصغير الزجاجي (Mini Glass Controller)
         buildMiniController(density)
 
         rootContainer.addView(bubbleView)
         rootContainer.addView(suitePanel)
         rootContainer.addView(miniControllerView)
 
+        // معالجة السحب والضغط بدقة
         bubbleView.setOnTouchListener(createDragTouchListener(params) {
             togglePanelExpansion(true)
         })
 
-        miniControllerView.setOnTouchListener(createDragTouchListener(params, isClickable = false))
+        miniControllerView.setOnTouchListener(createDragTouchListener(params, onClick = null))
 
         windowManager.addView(rootContainer, params)
         isAttached = true
         renderMainJobsView()
     }
 
-    // بناء الزر العائم الزجاجي الصغير (Mini Glass Controller)
     private fun buildMiniController(density: Float) {
         miniControllerView = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -301,7 +298,6 @@ class OverlayService : Service() {
             layoutParams = FrameLayout.LayoutParams((300 * density).toInt(), FrameLayout.LayoutParams.WRAP_CONTENT)
         }
 
-        // شريط العنوان والمتحكم
         val topRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -332,7 +328,6 @@ class OverlayService : Service() {
         topRow.addView(btnExitMini)
         miniControllerView.addView(topRow)
 
-        // الأزرار الفرعية الثلاثة المطلوبة
         val btnsRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = LinearLayout.LayoutParams(
@@ -361,28 +356,26 @@ class OverlayService : Service() {
         }
 
         // 1. تشغيل من البداية
-        val btnStartFresh = makeMiniActionBtn("▶ من البداية", Color.parseColor("#FFD700"), Color.parseColor("#0B0C10")) {
+        btnsRow.addView(makeMiniActionBtn("▶ من البداية", Color.parseColor("#FFD700"), Color.parseColor("#0B0C10")) {
             startExecutionFromBeginning()
-        }
+        })
 
         // 2. إيقاف (Stop)
-        val btnStop = makeMiniActionBtn("⏹ إيقاف", Color.parseColor("#EF4444"), Color.WHITE) {
+        btnsRow.addView(makeMiniActionBtn("⏹ إيقاف", Color.parseColor("#EF4444"), Color.WHITE) {
             stopExecution()
             miniStatusText.text = "⏹ متوقف عند الخطوة (${currentExecutionIndex + 1})"
-        }
+        })
 
         // 3. تكملة الخطوات (Resume)
-        val btnResume = makeMiniActionBtn("⏯ تكملة", Color.parseColor("#00E676"), Color.parseColor("#042614")) {
+        btnsRow.addView(makeMiniActionBtn("⏯ تكملة", Color.parseColor("#00E676"), Color.parseColor("#042614")) {
             resumeExecution()
-        }
+        })
 
-        btnsRow.addView(btnStartFresh)
-        btnsRow.addView(btnStop)
-        btnsRow.addView(btnResume)
         miniControllerView.addView(btnsRow)
     }
 
-    private fun createDragTouchListener(params: WindowManager.LayoutParams, isClickable: Boolean = true): View.OnTouchListener {
+    // تم تصحيح المعاملات بدقة لدعم الضغط والنقر الاختياري
+    private fun createDragTouchListener(params: WindowManager.LayoutParams, onClick: (() -> Unit)? = null): View.OnTouchListener {
         return object : View.OnTouchListener {
             private var initialX = 0
             private var initialY = 0
@@ -412,8 +405,8 @@ class OverlayService : Service() {
                         return true
                     }
                     MotionEvent.ACTION_UP -> {
-                        if (isClickable && System.currentTimeMillis() - downTime < 220 && abs(event.rawX - touchX) < 15) {
-                            togglePanelExpansion(true)
+                        if (System.currentTimeMillis() - downTime < 220 && abs(event.rawX - touchX) < 15) {
+                            onClick?.invoke()
                         }
                         return true
                     }
@@ -461,8 +454,8 @@ class OverlayService : Service() {
 
         header.addView(title)
         header.addView(makeGlassActionIcon("➕") { addEmptyCustomStep() })
-        header.addView(makeGlassActionIcon("💾") { showSaveScriptDialog() }) // حفظ السكربت الحالي
-        header.addView(makeGlassActionIcon("📜") { showInAppScriptsRepository() }) // مستودع السكربتات
+        header.addView(makeGlassActionIcon("💾") { showSaveScriptDialog() })
+        header.addView(makeGlassActionIcon("📜") { showInAppScriptsRepository() })
         header.addView(makeGlassActionIcon("📁") { showInAppTargetPicker() })
         header.addView(makeGlassActionIcon("⚙️") { showGlobalJobSettingsDialog() })
         header.addView(makeGlassActionIcon("✕") { togglePanelExpansion(false) })
@@ -707,7 +700,6 @@ class OverlayService : Service() {
         suitePanel.addView(btnRunJob)
     }
 
-    // نافذة حفظ السكربت الحالي
     private fun showSaveScriptDialog() {
         setKeyboardFocusable(true)
         suitePanel.removeAllViews()
@@ -790,7 +782,6 @@ class OverlayService : Service() {
         suitePanel.addView(btnCancel)
     }
 
-    // مستودع السكربتات داخل الاستوديو العائم
     private fun showInAppScriptsRepository() {
         suitePanel.removeAllViews()
         val density = resources.displayMetrics.density
@@ -898,7 +889,6 @@ class OverlayService : Service() {
         suitePanel.addView(btnBack)
     }
 
-    // فتح سكربت للتعديل
     fun loadScriptForEditing(name: String) {
         val data = ScriptStorage.loadScript(name)
         if (data != null) {
@@ -914,7 +904,6 @@ class OverlayService : Service() {
         }
     }
 
-    // فتح سكربت للتشغيل عبر الزر العائم الصغير
     fun loadScriptForMiniRunner(name: String) {
         val data = ScriptStorage.loadScript(name)
         if (data != null) {
@@ -932,8 +921,6 @@ class OverlayService : Service() {
             Toast.makeText(this, "تم تفعيل المتحكم العائم للسكربت!", Toast.LENGTH_SHORT).show()
         }
     }
-
-    // --- منطق التشغيل والتكملة (Resume & Restart) ---
 
     private fun startExecutionFromBeginning() {
         stopExecution()
