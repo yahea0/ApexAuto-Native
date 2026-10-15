@@ -12,24 +12,24 @@
         android:gravity="center_horizontal"
         android:orientation="vertical">
 
-        <!-- Logo & Header -->
+        <!-- لوجو وواجهة العنوان الزجاجية -->
         <FrameLayout
-            android:layout_width="66dp"
-            android:layout_height="66dp"
-            android:layout_marginTop="20dp"
+            android:layout_width="68dp"
+            android:layout_height="68dp"
+            android:layout_marginTop="22dp"
             android:background="@drawable/bg_chip_glass">
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
                 android:text="⚡"
-                android:textSize="30sp" />
+                android:textSize="32sp" />
         </FrameLayout>
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="14dp"
             android:letterSpacing="0.08"
             android:text="APEX AUTO PRO"
             android:textColor="@color/neon_gold"
@@ -39,12 +39,12 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="24dp"
+            android:layout_marginBottom="26dp"
             android:text="AI Multi-Angle Autonomous Studio"
             android:textColor="@color/text_secondary"
             android:textSize="13sp" />
 
-        <!-- بطاقة 1: محرك النقر المباشر -->
+        <!-- 1. بطاقة محرك النقر المباشر -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -64,7 +64,7 @@
                 android:textStyle="bold" />
 
             <Button
-                android:id="@+id/btn_accessibility"
+                android:id="@+id/btn_enable_accessibility"
                 android:layout_width="match_parent"
                 android:layout_height="52dp"
                 android:layout_marginTop="16dp"
@@ -76,7 +76,7 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- بطاقة 2: استوديو الأتمتة العائم -->
+        <!-- 2. بطاقة استوديو الأتمتة العائم -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -96,7 +96,7 @@
                 android:textStyle="bold" />
 
             <Button
-                android:id="@+id/btn_launch_studio"
+                android:id="@+id/btn_start_overlay"
                 android:layout_width="match_parent"
                 android:layout_height="52dp"
                 android:layout_marginTop="16dp"
@@ -108,7 +108,7 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- بطاقة 3: مستودع الأهداف -->
+        <!-- 3. بطاقة مستودع الأهداف والـ AI -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -137,7 +137,7 @@
                 android:textSize="12sp" />
 
             <Button
-                android:id="@+id/btn_manage_targets"
+                android:id="@+id/btn_open_library"
                 android:layout_width="match_parent"
                 android:layout_height="52dp"
                 android:layout_marginTop="16dp"
