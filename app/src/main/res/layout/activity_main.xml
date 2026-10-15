@@ -12,11 +12,11 @@
         android:gravity="center_horizontal"
         android:orientation="vertical">
 
-        <!-- لوجو وواجهة العنوان الزجاجية -->
+        <!-- Logo & Header -->
         <FrameLayout
             android:layout_width="68dp"
             android:layout_height="68dp"
-            android:layout_marginTop="22dp"
+            android:layout_marginTop="20dp"
             android:background="@drawable/bg_chip_glass">
             <TextView
                 android:layout_width="wrap_content"
@@ -29,7 +29,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
+            android:layout_marginTop="12dp"
             android:letterSpacing="0.08"
             android:text="APEX AUTO PRO"
             android:textColor="@color/neon_gold"
@@ -39,12 +39,12 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="26dp"
+            android:layout_marginBottom="24dp"
             android:text="AI Multi-Angle Autonomous Studio"
             android:textColor="@color/text_secondary"
             android:textSize="13sp" />
 
-        <!-- 1. بطاقة محرك النقر المباشر -->
+        <!-- 1. محرك النقر المباشر -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -76,7 +76,7 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- 2. بطاقة استوديو الأتمتة العائم -->
+        <!-- 2. استوديو الأتمتة العائم -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -108,7 +108,7 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- 3. بطاقة مستودع الأهداف والـ AI -->
+        <!-- 3. مستودع الصور والأهداف -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
