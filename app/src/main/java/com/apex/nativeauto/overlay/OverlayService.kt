@@ -51,7 +51,6 @@ class OverlayService : Service() {
         const val ACTION_RUN_MINI_CONTROLLER = "ACTION_RUN_MINI_CONTROLLER"
         const val EXTRA_SCRIPT_NAME = "EXTRA_SCRIPT_NAME"
 
-        // إضافة هدف جديد معزول تماماً ومربوط باسم السكربت الحالي
         fun addGalleryTarget(bitmap: Bitmap) {
             instance?.let { service ->
                 service.mainHandler.post {
@@ -69,12 +68,10 @@ class OverlayService : Service() {
                     )
                     ImageLibrary.saveTarget(targetName, bitmap)
                     service.stepsList.add(newStep)
-
-                    // حفظ تلقائي فوري في مجلد السكربت لضمان عدم ضياع الصور
                     ScriptStorage.saveScript(service.currentScriptName, service.stepsList, service.loopCountLimit)
 
-                    service.renderMainJobsView()
-                    service.togglePanelExpansion(true)
+                    // استعادة ظهور النافذة العائمة فور تمام إضافة الصورة
+                    service.restoreOverlayAfterPicker()
                 }
             }
         }
@@ -86,6 +83,7 @@ class OverlayService : Service() {
                         service.stepsList[stepIndex].trainedVariations.add(bitmap)
                         ScriptStorage.saveScript(service.currentScriptName, service.stepsList, service.loopCountLimit)
                         Toast.makeText(service.applicationContext, "✓ أضيفت زاوية تدريبية جديدة بنجاح!", Toast.LENGTH_SHORT).show()
+                        service.restoreOverlayAfterPicker()
                         service.showActionSettingsDialog(stepIndex)
                     }
                 }
@@ -109,7 +107,7 @@ class OverlayService : Service() {
     }
 
     private lateinit var windowManager: WindowManager
-    private lateinit var rootContainer: FrameLayout
+    lateinit var rootContainer: FrameLayout
     private lateinit var bubbleView: TextView
     private lateinit var suitePanel: LinearLayout
     private lateinit var miniControllerView: LinearLayout
@@ -121,9 +119,9 @@ class OverlayService : Service() {
     val mainHandler = Handler(Looper.getMainLooper())
 
     private var executionJob: Job? = null
-    private var isRunningLoop = false
+    var isRunningLoop = false
     private var isAttached = false
-    private var loopCountLimit = 0
+    var loopCountLimit = 0
     private var currentExecutionIndex = 0
     var currentScriptName = "Script_1"
 
@@ -216,6 +214,24 @@ class OverlayService : Service() {
         return params
     }
 
+    fun hideOverlayForPicker() {
+        mainHandler.post {
+            if (::rootContainer.isInitialized) {
+                rootContainer.visibility = View.GONE
+            }
+        }
+    }
+
+    fun restoreOverlayAfterPicker() {
+        mainHandler.post {
+            if (::rootContainer.isInitialized) {
+                rootContainer.visibility = View.VISIBLE
+                togglePanelExpansion(true)
+                renderMainJobsView()
+            }
+        }
+    }
+
     private fun setKeyboardFocusable(focusable: Boolean) {
         if (!isAttached || !::rootContainer.isInitialized) return
         try {
@@ -241,6 +257,22 @@ class OverlayService : Service() {
         val layoutParams = suitePanel.layoutParams
         layoutParams.width = targetWidth
         suitePanel.layoutParams = layoutParams
+    }
+
+    private fun updateBubbleRunningState(running: Boolean) {
+        mainHandler.post {
+            if (::bubbleView.isInitialized) {
+                val density = resources.displayMetrics.density
+                val bg = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(if (running) Color.parseColor("#E6042614") else Color.parseColor("#E60D121F"))
+                    setStroke((1.5f * density).toInt(), if (running) Color.parseColor("#00E676") else Color.parseColor("#80FFD700"))
+                }
+                bubbleView.background = bg
+                bubbleView.setTextColor(if (running) Color.parseColor("#00E676") else Color.parseColor("#FFD700"))
+                bubbleView.text = if (running) "▶" else "⚡"
+            }
+        }
     }
 
     private fun buildOverlayUI() {
@@ -281,7 +313,13 @@ class OverlayService : Service() {
         rootContainer.addView(miniControllerView)
 
         bubbleView.setOnTouchListener(createDragTouchListener(params) {
-            togglePanelExpansion(true)
+            if (isRunningLoop) {
+                stopExecution()
+                Toast.makeText(applicationContext, "⏹ تم إيقاف السكربت", Toast.LENGTH_SHORT).show()
+                togglePanelExpansion(true)
+            } else {
+                togglePanelExpansion(true)
+            }
         })
 
         miniControllerView.setOnTouchListener(createDragTouchListener(params, onClick = null))
@@ -655,6 +693,7 @@ class OverlayService : Service() {
             setOnClickListener { showInAppTargetPicker() }
         }
 
+        // زر المعرض مع الإخفاء التلقائي الفوري للنافذة
         val btnGalleryAction = Button(this).apply {
             text = "🖼️ من المعرض"
             setTextColor(Color.WHITE)
@@ -670,6 +709,7 @@ class OverlayService : Service() {
                 marginStart = (5 * density).toInt()
             }
             setOnClickListener {
+                hideOverlayForPicker()
                 val intent = Intent(this@OverlayService, TransparentPickerActivity::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
                 }
@@ -681,6 +721,7 @@ class OverlayService : Service() {
         buttonsRow.addView(btnGalleryAction)
         suitePanel.addView(buttonsRow)
 
+        // زر Run Job مع الإغلاق التلقائي الفوري وبدء العمل المباشر
         val btnRunJob = Button(this).apply {
             text = if (isRunningLoop) "⏹ Stop Job" else "▶ Run Job"
             setTextColor(if (isRunningLoop) Color.WHITE else Color.parseColor("#042614"))
@@ -696,8 +737,15 @@ class OverlayService : Service() {
                 (46 * density).toInt()
             ).apply { topMargin = (8 * density).toInt() }
             setOnClickListener {
-                if (isRunningLoop) stopExecution() else startExecutionFromBeginning()
-                renderMainJobsView()
+                if (isRunningLoop) {
+                    stopExecution()
+                    renderMainJobsView()
+                } else {
+                    // إغلاق النافذة العائمة فوراً وبدء السكربت المباشر دون حجب الشاشة
+                    togglePanelExpansion(false)
+                    Toast.makeText(applicationContext, "▶ بدأ تشغيل السكربت: $currentScriptName", Toast.LENGTH_SHORT).show()
+                    startExecutionFromBeginning()
+                }
             }
         }
         suitePanel.addView(btnRunJob)
@@ -892,7 +940,6 @@ class OverlayService : Service() {
         suitePanel.addView(btnBack)
     }
 
-    // تفريغ وتحميل السكربت المحدد حصراً مع صوره المستقلة
     fun loadScriptForEditing(name: String) {
         val data = ScriptStorage.loadScript(name)
         if (data != null) {
@@ -944,6 +991,7 @@ class OverlayService : Service() {
         }
 
         isRunningLoop = true
+        updateBubbleRunningState(true)
         miniStatusText.text = "▶ جاري تشغيل: $currentScriptName"
 
         executionJob = scope.launch {
@@ -990,6 +1038,7 @@ class OverlayService : Service() {
                 }
             }
             isRunningLoop = false
+            updateBubbleRunningState(false)
             mainHandler.post {
                 miniStatusText.text = "⏹ متوقف: $currentScriptName"
                 renderMainJobsView()
@@ -1001,6 +1050,7 @@ class OverlayService : Service() {
         isRunningLoop = false
         executionJob?.cancel()
         executionJob = null
+        updateBubbleRunningState(false)
     }
 
     private fun addEmptyCustomStep() {
@@ -1208,6 +1258,7 @@ class OverlayService : Service() {
                     (38 * density).toInt()
                 ).apply { topMargin = (6 * density).toInt() }
                 setOnClickListener {
+                    hideOverlayForPicker()
                     val intent = Intent(this@OverlayService, TransparentPickerActivity::class.java).apply {
                         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
                         putExtra("IS_TRAINING_MODE", true)
@@ -1354,6 +1405,7 @@ class OverlayService : Service() {
         suitePanel.addView(btnSave)
     }
 
+    // 🌟 محرر الكود المطور مع شريط الأوامر المتقدم والهيكلة التلقائية الذكية
     private fun openJsEditor(index: Int) {
         setKeyboardFocusable(true)
         setPanelDimensions(true)
@@ -1471,10 +1523,12 @@ class OverlayService : Service() {
 
         suitePanel.addView(editActionsBar)
 
-        fun insertSnippet(snippet: String) {
-            val start = max(0, editCode.selectionStart)
-            val end = max(0, editCode.selectionEnd)
-            editCode.text.replace(min(start, end), max(start, end), snippet)
+        // دالة المساعد الذكي لإعادة هيكلة وتنسيق الكود تلقائياً عند الضغط على أي أمر
+        fun applySmartAction(actionType: String?) {
+            val current = editCode.text.toString()
+            val structured = SmartCodeAssembler.assemble(current, step.targetImageName, actionType)
+            editCode.setText(structured)
+            editCode.setSelection(editCode.text.length)
         }
 
         val toolbarScroll = HorizontalScrollView(this).apply {
@@ -1486,7 +1540,7 @@ class OverlayService : Service() {
         }
         val toolbarContainer = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
 
-        fun makeSnippetBtn(label: String, code: String): Button {
+        fun makeSnippetBtn(label: String, actionType: String): Button {
             return Button(this).apply {
                 text = label
                 textSize = 10.5f
@@ -1502,21 +1556,40 @@ class OverlayService : Service() {
                     LinearLayout.LayoutParams.WRAP_CONTENT,
                     (28 * density).toInt()
                 ).apply { marginEnd = (6 * density).toInt() }
-                setOnClickListener { insertSnippet(code) }
+                setOnClickListener { applySmartAction(actionType) }
             }
         }
 
-        toolbarContainer.addView(makeSnippetBtn("👆 click", "click(x, y);\n"))
-        toolbarContainer.addView(makeSnippetBtn("👆 clickImage", "clickImage(\"${step.targetImageName}\", 70);\n"))
-        toolbarContainer.addView(makeSnippetBtn("👁️ findImage", "let res = findImage(\"${step.targetImageName}\", 70);\nif (res.found) {\n    click(res.x, res.y);\n}\n"))
-        toolbarContainer.addView(makeSnippetBtn("⏱️ sleep", "sleep(500);\n"))
-        toolbarContainer.addView(makeSnippetBtn("↔️ swipe", "swipe(x, y, x, y - 400, 300);\n"))
-        toolbarContainer.addView(makeSnippetBtn("⏳ longClick", "longClick(x, y, 800);\n"))
-        toolbarContainer.addView(makeSnippetBtn("🎲 random", "let r = random(200, 500);\nsleep(r);\n"))
-        toolbarContainer.addView(makeSnippetBtn("💬 toast", "toast(\"تم التنفيذ بنجاح!\");\n"))
-        toolbarContainer.addView(makeSnippetBtn("🔙 Back", "pressBack();\n"))
-        toolbarContainer.addView(makeSnippetBtn("🏠 Home", "pressHome();\n"))
-        toolbarContainer.addView(makeSnippetBtn("📑 Recent", "pressRecent();\n"))
+        // الأوامر الشاملة لصياغة كود متين
+        toolbarContainer.addView(makeSnippetBtn("👁️ findImage", "findImage"))
+        toolbarContainer.addView(makeSnippetBtn("⚖️ if / else", "ifElse"))
+        toolbarContainer.addView(makeSnippetBtn("👆 click", "click"))
+        toolbarContainer.addView(makeSnippetBtn("🎯 clickImage", "clickImage"))
+        toolbarContainer.addView(makeSnippetBtn("⏱️ sleep", "sleep"))
+        toolbarContainer.addView(makeSnippetBtn("↔️ swipe", "swipe"))
+        toolbarContainer.addView(makeSnippetBtn("🛡️ try/catch", "tryCatch"))
+        toolbarContainer.addView(makeSnippetBtn("🔄 retry (3x)", "retry"))
+        toolbarContainer.addView(makeSnippetBtn("💬 toast (نجاح/فشل)", "toast"))
+
+        // زر التنسيق والهيكلة التلقائية الشاملة
+        val btnAutoFormat = Button(this).apply {
+            text = "✨ تنسيق وترتيب الكود"
+            textSize = 10.5f
+            setTextColor(Color.parseColor("#00E676"))
+            stateListAnimator = null
+            background = GradientDrawable().apply {
+                cornerRadius = 10 * density
+                setColor(Color.parseColor("#1A00E676"))
+                setStroke(1, Color.parseColor("#4D00E676"))
+            }
+            setPadding((12 * density).toInt(), 0, (12 * density).toInt(), 0)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                (28 * density).toInt()
+            ).apply { marginEnd = (6 * density).toInt() }
+            setOnClickListener { applySmartAction(null) }
+        }
+        toolbarContainer.addView(btnAutoFormat)
 
         val btnPickTargetName = Button(this).apply {
             text = "📁 اسم هدف"
@@ -1534,13 +1607,16 @@ class OverlayService : Service() {
                 (28 * density).toInt()
             )
             setOnClickListener {
-                insertSnippet("\"${step.targetImageName}\"")
+                val start = max(0, editCode.selectionStart)
+                val end = max(0, editCode.selectionEnd)
+                editCode.text.replace(min(start, end), max(start, end), "\"${step.targetImageName}\"")
             }
         }
         toolbarContainer.addView(btnPickTargetName)
 
         toolbarScroll.addView(toolbarContainer)
         suitePanel.addView(toolbarScroll)
+
         suitePanel.addView(editCode)
 
         val btnSave = Button(this).apply {
