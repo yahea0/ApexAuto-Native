@@ -124,7 +124,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // نافذة مستودع السكربتات المحفوظة
     private fun openScriptsRepositoryDialog() {
         val dialog = Dialog(this)
         dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
@@ -188,7 +187,6 @@ class MainActivity : AppCompatActivity() {
                     ).apply { topMargin = (8 * density).toInt() }
                 }
 
-                // سطر العنوان وأيقونة الحذف
                 val topRow = LinearLayout(this).apply {
                     orientation = LinearLayout.HORIZONTAL
                     gravity = Gravity.CENTER_VERTICAL
@@ -217,7 +215,6 @@ class MainActivity : AppCompatActivity() {
                 topRow.addView(btnDelete)
                 card.addView(topRow)
 
-                // سطر الأزرار الرئيسية: [تعديل السكربت] و [تشغيل السكربت]
                 val actionsRow = LinearLayout(this).apply {
                     orientation = LinearLayout.HORIZONTAL
                     layoutParams = LinearLayout.LayoutParams(
@@ -226,7 +223,6 @@ class MainActivity : AppCompatActivity() {
                     ).apply { topMargin = (8 * density).toInt() }
                 }
 
-                // أولاً: خيار تعديل السكربت
                 val btnEdit = Button(this).apply {
                     text = "✏️ تعديل السكربت"
                     setTextColor(Color.WHITE)
@@ -247,7 +243,6 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
 
-                // ثانياً: خيار تشغيل السكربت
                 val btnRun = Button(this).apply {
                     text = "▶️ تشغيل السكربت"
                     setTextColor(Color.parseColor("#042614"))
@@ -358,7 +353,7 @@ class MainActivity : AppCompatActivity() {
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
-                setPadding((10 * density).toInt(), (10 * density).toInt(), (10 * density).toInt(), (10 * density).toInt())
+                setPadding((10 * density).toInt(), (8 * density).toInt(), (10 * density).toInt(), (8 * density).toInt())
                 background = GradientDrawable().apply {
                     cornerRadius = 14 * density
                     setColor(Color.parseColor("#14FFFFFF"))
